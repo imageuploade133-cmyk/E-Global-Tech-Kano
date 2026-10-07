@@ -117,23 +117,23 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
   // Session / Permission loading state for skeleton rendering
   const [isLoadingSession, setIsLoadingSession] = useState(true);
 
-  // Sidebar state & Unreplied Customer Reviews Badge state
+  // Sidebar state & Notification Badge counts state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isStoreExpanded, setIsStoreExpanded] = useState(pathname.startsWith("/cpanel/store"));
   const [isEstateExpanded, setIsEstateExpanded] = useState(pathname.startsWith("/cpanel/estate"));
-  const [unrepliedReviewsBadge, setUnrepliedReviewsBadge] = useState<number>(0);
+  const [sidebarCounts, setSidebarCounts] = useState<Record<string, number>>({});
 
-  // Fetch unreplied reviews count for slide menu notification
+  // Fetch slide menu notification counts across KYC, limits, held deposits, estate, store orders & reviews
   useEffect(() => {
-    const fetchUnrepliedCount = async () => {
+    const fetchSidebarCounts = async () => {
       try {
         const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
         const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
-        const res = await fetch("/api/admin/store/reviews?countOnly=true", { headers });
+        const res = await fetch("/api/admin/sidebar-counts", { headers });
         const data = await res.json();
-        if (data.success && typeof data.unrepliedCount === "number") {
-          setUnrepliedReviewsBadge(data.unrepliedCount);
+        if (data.success && data.counts) {
+          setSidebarCounts(data.counts);
         }
       } catch {
         // Ignore background polling errors
@@ -141,15 +141,17 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
     };
 
     if (isAdminUnlocked) {
-      fetchUnrepliedCount();
-      const interval = setInterval(fetchUnrepliedCount, 15000); // Polling every 15s
+      fetchSidebarCounts();
+      const interval = setInterval(fetchSidebarCounts, 30000); // Polling every 30s for low reads
 
-      const handleReviewsUpdated = () => fetchUnrepliedCount();
-      window.addEventListener("cpanel_reviews_updated", handleReviewsUpdated);
+      const handleSidebarUpdated = () => fetchSidebarCounts();
+      window.addEventListener("cpanel_sidebar_updated", handleSidebarUpdated);
+      window.addEventListener("cpanel_reviews_updated", handleSidebarUpdated);
 
       return () => {
         clearInterval(interval);
-        window.removeEventListener("cpanel_reviews_updated", handleReviewsUpdated);
+        window.removeEventListener("cpanel_sidebar_updated", handleSidebarUpdated);
+        window.removeEventListener("cpanel_reviews_updated", handleSidebarUpdated);
       };
     }
   }, [isAdminUnlocked]);
@@ -398,15 +400,18 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
       items: [
         { id: "users", label: "Users & Permissions", icon: "group", href: "/cpanel/users", permission: "users.view" },
         { id: "virtual_accounts", label: "Virtual Accounts", icon: "account_balance_wallet", href: "/cpanel/virtual-accounts", permission: "users.view" },
-        { id: "kyc", label: "KYC Approvals", icon: "verified_user", href: "/cpanel/kyc", permission: "kyc.view" },
-        { id: "virtual_accounts", label: "Virtual Account", icon: "account_balance_wallet", href: "/cpanel/virtual-account", permission: "virtual_accounts.view" },
+        { id: "kyc", label: "KYC Approvals", icon: "verified_user", href: "/cpanel/kyc", badge: sidebarCounts["kyc"], permission: "kyc.view" },
+        { id: "limit_requests", label: "Limit Requests", icon: "manage_accounts", href: "/cpanel/limit-requests", badge: sidebarCounts["limit_requests"], permission: "users.manage" },
         { id: "freeze", label: "Account Freeze", icon: "ac_unit", href: "/cpanel/freeze", permission: "freeze.manage" },
-        { id: "limits", label: "Account Limits", icon: "trending_up", href: "/cpanel/limits", permission: "limits.manage" },
+        { id: "tier_levels", label: "Assign Tier Levels", icon: "workspace_premium", href: "/cpanel/tier-levels", permission: "limits.manage" },
+        { id: "set_limits", label: "Set Limits", icon: "tune", href: "/cpanel/set-limits", permission: "limits.manage" },
+        { id: "limits", label: "Global Transfer Limits", icon: "trending_up", href: "/cpanel/limits", permission: "limits.manage" },
       ]
     },
     {
       title: "Branding & Customization",
       items: [
+        { id: "push_notifications", label: "Push Notifications", icon: "notifications_active", href: "/cpanel/push-notifications", permission: "branding.manage" },
         { id: "emergency", label: "Emergency Broadcast", icon: "campaign", href: "/cpanel/emergency", permission: "branding.manage" },
         { id: "settings", label: "Global Settings", icon: "settings_suggest", href: "/cpanel/settings", permission: "branding.manage" },
         { id: "feature_toggles", label: "Service Feature Controls", icon: "toggle_on", href: "/cpanel/feature-toggles", permission: "feature_toggle.manage" },
@@ -422,6 +427,9 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
     {
       title: "Financials & Markups",
       items: [
+        { id: "deposit", label: "Deposit Fund", icon: "add_card", href: "/cpanel/deposit", permission: "wallets.manage" },
+        { id: "inflow_deductions", label: "Auto Inflow Fees", icon: "price_change", href: "/cpanel/inflow-deductions", permission: "wallets.manage" },
+        { id: "held_deposits", label: "Blocked & Held", icon: "lock_clock", href: "/cpanel/held-deposits", badge: sidebarCounts["held_deposits"], permission: "wallets.manage" },
         { id: "deductions", label: "Global Wallet Deductions", icon: "payments", href: "/cpanel/deductions", permission: "wallet.deductions.manage" },
         { id: "profit", label: "Commission Markups", icon: "tune", href: "/cpanel/vtu-profit", permission: "vtu.manage" },
         { id: "exchange_rates", label: "Exchange Rates & Swaps", icon: "currency_exchange", href: "/cpanel/exchange-rates", permission: "exchange_rates.manage" },
@@ -433,8 +441,8 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
 
   const storeNavItems: NavItem[] = [
     { id: "store_products", label: "Store Products", icon: "inventory_2", href: "/cpanel/store", exact: true, permission: "store.view" },
-    { id: "store_orders", label: "Dispatch Orders", icon: "shopping_bag", href: "/cpanel/store/orders", permission: "store.view" },
-    { id: "store_reviews", label: "Customer Reviews", icon: "rate_review", href: "/cpanel/store/reviews", badge: unrepliedReviewsBadge, permission: "store.view" },
+    { id: "store_orders", label: "Dispatch Orders", icon: "shopping_bag", href: "/cpanel/store/orders", badge: sidebarCounts["store_orders"], permission: "store.view" },
+    { id: "store_reviews", label: "Customer Reviews", icon: "rate_review", href: "/cpanel/store/reviews", badge: sidebarCounts["store_reviews"], permission: "store.view" },
     { id: "store_stock", label: "Stock Income", icon: "trending_up", href: "/cpanel/store/stock", permission: "store.view" },
     { id: "store_categories", label: "Manage Categories", icon: "category", href: "/cpanel/store/categories", permission: "store.view" },
     { id: "store_slides", label: "Store Slides", icon: "view_carousel", href: "/cpanel/store/slides", permission: "store.view" },
@@ -442,14 +450,17 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
   ];
 
   const estateNavItems: NavItem[] = [
-    { id: "estate_properties", label: "Property Listings", icon: "home_work", href: "/cpanel/estate", exact: true, permission: "estate.view" },
+    { id: "estate_properties", label: "Property Listings", icon: "home_work", href: "/cpanel/estate", exact: true, badge: sidebarCounts["estate_properties"], permission: "estate.view" },
     { id: "estate_slides", label: "Estate Slides & Banners", icon: "view_carousel", href: "/cpanel/estate/slides", permission: "estate.view" },
-    { id: "estate_edits", label: "Property Edits & Audit", icon: "rate_review", href: "/cpanel/estate/edits", permission: "estate.view" },
-    { id: "estate_sellers", label: "Sellers & Agents", icon: "badge", href: "/cpanel/estate/sellers", permission: "estate.view" },
-    { id: "estate_inquiries", label: "Customer Inquiries", icon: "contact_support", href: "/cpanel/estate/inquiries", permission: "estate.view" },
-    { id: "estate_reports", label: "Flagged Reports", icon: "flag", href: "/cpanel/estate/reports", permission: "estate.view" },
+    { id: "estate_edits", label: "Property Edits & Audit", icon: "rate_review", href: "/cpanel/estate/edits", badge: sidebarCounts["estate_edits"], permission: "estate.view" },
+    { id: "estate_sellers", label: "Sellers & Agents", icon: "badge", href: "/cpanel/estate/sellers", badge: sidebarCounts["estate_sellers"], permission: "estate.view" },
+    { id: "estate_inquiries", label: "Customer Inquiries", icon: "contact_support", href: "/cpanel/estate/inquiries", badge: sidebarCounts["estate_inquiries"], permission: "estate.view" },
+    { id: "estate_reports", label: "Flagged Reports", icon: "flag", href: "/cpanel/estate/reports", badge: sidebarCounts["estate_reports"], permission: "estate.view" },
     { id: "estate_settings", label: "Property Settings", icon: "settings", href: "/cpanel/estate/settings", permission: "estate.view" },
   ];
+
+  const estateTotalBadge = (sidebarCounts["estate_properties"] || 0) + (sidebarCounts["estate_edits"] || 0) + (sidebarCounts["estate_sellers"] || 0) + (sidebarCounts["estate_inquiries"] || 0) + (sidebarCounts["estate_reports"] || 0);
+  const storeTotalBadge = (sidebarCounts["store_orders"] || 0) + (sidebarCounts["store_reviews"] || 0);
 
   const checkItemPermission = (item: NavItem): boolean => {
     if (!item.permission) return true;
@@ -883,15 +894,22 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                           onClick={() => setIsMenuOpen(false)}
                           title={isSidebarMinimized && !isMenuOpen ? item.label : undefined}
                           className={cn(
-                            "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                            "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full justify-between",
                             isSidebarMinimized && !isMenuOpen && "justify-center px-0 py-2.5",
                             active
                               ? "bg-orange-500/10 text-[#FC7A00] border border-orange-500/20"
                               : isDark ? "text-gray-400 hover:bg-gray-800 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                           )}
                         >
-                          <span className="material-symbols-outlined text-[18px] flex-shrink-0">{item.icon}</span>
-                          {(!isSidebarMinimized || isMenuOpen) && <span className="flex-1 text-left truncate">{item.label}</span>}
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="material-symbols-outlined text-[18px] flex-shrink-0">{item.icon}</span>
+                            {(!isSidebarMinimized || isMenuOpen) && <span className="flex-1 text-left truncate">{item.label}</span>}
+                          </div>
+                          {item.badge && item.badge > 0 ? (
+                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-red-500 text-white animate-pulse">
+                              {item.badge}
+                            </span>
+                          ) : null}
                         </Link>
                       );
                     })}
@@ -924,9 +942,16 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                         {(!isSidebarMinimized || isMenuOpen) && <span>Estate Marketplace</span>}
                       </div>
                       {(!isSidebarMinimized || isMenuOpen) && (
-                        <span className="material-symbols-outlined text-[16px]">
-                          {isEstateExpanded ? "expand_less" : "expand_more"}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {estateTotalBadge > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-red-500 text-white animate-pulse">
+                              {estateTotalBadge}
+                            </span>
+                          )}
+                          <span className="material-symbols-outlined text-[16px]">
+                            {isEstateExpanded ? "expand_less" : "expand_more"}
+                          </span>
+                        </div>
                       )}
                     </button>
 
@@ -950,6 +975,11 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                                 <span className="material-symbols-outlined text-[15px] flex-shrink-0">{sub.icon}</span>
                                 <span className="flex-1 text-left truncate">{sub.label}</span>
                               </div>
+                              {sub.badge && sub.badge > 0 ? (
+                                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-red-500 text-white animate-pulse">
+                                  {sub.badge}
+                                </span>
+                              ) : null}
                             </Link>
                           );
                         })}
@@ -984,9 +1014,16 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                         {(!isSidebarMinimized || isMenuOpen) && <span>Storefront Manager</span>}
                       </div>
                       {(!isSidebarMinimized || isMenuOpen) && (
-                        <span className="material-symbols-outlined text-[16px]">
-                          {isStoreExpanded ? "expand_less" : "expand_more"}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {storeTotalBadge > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-red-500 text-white animate-pulse">
+                              {storeTotalBadge}
+                            </span>
+                          )}
+                          <span className="material-symbols-outlined text-[16px]">
+                            {isStoreExpanded ? "expand_less" : "expand_more"}
+                          </span>
+                        </div>
                       )}
                     </button>
 

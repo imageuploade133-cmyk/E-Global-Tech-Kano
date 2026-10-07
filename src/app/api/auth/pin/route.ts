@@ -27,12 +27,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { action, pin } = body;
+    const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
 
     if (!action || !["set", "verify", "reset"].includes(action)) {
       return NextResponse.json({ error: "Invalid action. Supported: set, verify, reset." }, { status: 400 });
     }
 
-    if (!pin || typeof pin !== "string" || pin.length !== 4 || isNaN(Number(pin))) {
+    if (!isBiometricAuth && (!pin || typeof pin !== "string" || pin.length !== 4 || isNaN(Number(pin)))) {
       return NextResponse.json({ error: "PIN must be a valid 4-digit numeric string." }, { status: 400 });
     }
 
@@ -95,7 +96,11 @@ export async function POST(req: Request) {
         }
 
         let isMatch = false;
-        if (uid === "mock-uid") {
+        const isUserBiometricEnabled = userData.isBiometricTransferEnabled === true || userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
+        const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
+        if (isBiometricAuth && isUserBiometricEnabled) {
+          isMatch = true;
+        } else if (uid === "mock-uid") {
           // Mock verification bypass for integration tests
           isMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
         } else if (pinHash) {

@@ -181,6 +181,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Slide image URL is required." }, { status: 400 });
       }
 
+      const slidePosition = typeof slide.position === "number" ? Math.max(1, slide.position) : (typeof slide.position === "string" && !isNaN(parseInt(slide.position)) ? Math.max(1, parseInt(slide.position)) : 1);
+
       if (action === "edit_slide" && slide.id) {
         slides = slides.map((s: any) => {
           if (s.id === slide.id) {
@@ -191,6 +193,7 @@ export async function POST(req: Request) {
               subtitle: (slide.subtitle || "").trim(),
               description: (slide.description || slide.subtitle || "").trim(),
               link: (slide.link || "").trim(),
+              position: slidePosition,
               customWidth: typeof slide.customWidth === "number" ? slide.customWidth : (slide.customWidth ? Number(slide.customWidth) : null),
               customHeight: typeof slide.customHeight === "number" ? slide.customHeight : (slide.customHeight ? Number(slide.customHeight) : null),
               mobileHeight: typeof slide.mobileHeight === "number" ? slide.mobileHeight : (slide.mobileHeight ? Number(slide.mobileHeight) : 176),
@@ -211,6 +214,7 @@ export async function POST(req: Request) {
           subtitle: (slide.subtitle || "").trim(),
           description: (slide.description || slide.subtitle || "").trim(),
           link: (slide.link || "").trim(),
+          position: slidePosition,
           customWidth: typeof slide.customWidth === "number" ? slide.customWidth : (slide.customWidth ? Number(slide.customWidth) : null),
           customHeight: typeof slide.customHeight === "number" ? slide.customHeight : (slide.customHeight ? Number(slide.customHeight) : null),
           mobileHeight: typeof slide.mobileHeight === "number" ? slide.mobileHeight : (slide.mobileHeight ? Number(slide.mobileHeight) : 176),
@@ -223,6 +227,16 @@ export async function POST(req: Request) {
         };
         slides.unshift(newSlide);
       }
+
+      // Sort slides by position ascending
+      slides.sort((a: any, b: any) => {
+        const posA = typeof a.position === "number" ? a.position : 9999;
+        const posB = typeof b.position === "number" ? b.position : 9999;
+        if (posA !== posB) return posA - posB;
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
     } else if (action === "delete_slide") {
       if (!slideId) {
         return NextResponse.json({ error: "slideId is required for deletion." }, { status: 400 });

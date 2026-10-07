@@ -12,6 +12,7 @@ import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { handleAppSignOut } from "@/lib/logout-util";
 import { AppLogo } from "@/components/AppLogo";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { getBiometricLabel, getBiometricType, authenticateBiometricDetailed } from "@/lib/biometrics-util";
 
 function maskEmail(email?: string | null): string {
   if (!email || !email.includes("@")) return "t***t@gmail.com";
@@ -47,6 +48,48 @@ export default function PinPage() {
   // Logout confirmation state
   const [isLogoutDrawerOpen, setIsLogoutDrawerOpen] = useState(false);
 
+  const biometricLabel = getBiometricLabel();
+  const biometricType = getBiometricType();
+
+  // Face ID / Biometrics Modal State
+  const [showFaceIdModal, setShowFaceIdModal] = useState(false);
+
+  useModalBackHandler(showFaceIdModal, () => setShowFaceIdModal(false), "face-id-drawer");
+
+  // Biometric login execution - triggered explicitly on user button click or automatically on launch
+  const handleBiometricAuth = async () => {
+    // Verify if biometric login has been enabled by user
+    const isBiometricEnabled = userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true;
+    if (!isBiometricEnabled) {
+      toast.error("Kindly enable Biometric Login in Security Settings to have access.");
+      return;
+    }
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.error("Internet connection required to verify biometrics and log in.");
+      return;
+    }
+
+    toast.loading(`Authenticating ${biometricLabel}...`);
+    const res = await authenticateBiometricDetailed(`Login with ${biometricLabel}`);
+    toast.dismiss();
+
+    if (res.success) {
+      if (userData?.is2faOtpEnabled === true) {
+        setIs2faStage(true);
+        return;
+      }
+      setPinVerified(true);
+      toast.success(`${biometricLabel} Authenticated! Welcome back.`);
+      router.push("/");
+    } else if (res.cancelled) {
+      setPin("");
+    } else {
+      toast.error(res.message || `${biometricLabel} authentication failed.`);
+      setPin("");
+    }
+  };
+
   // Loading Delay State
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyingText, setVerifyingText] = useState("Securing connection...");
@@ -80,6 +123,141 @@ export default function PinPage() {
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isSavingNewPin, setIsSavingNewPin] = useState(false);
+
+  // 2FA Login OTP Stage States on Access PIN screen
+  const [is2faStage, setIs2faStage] = useState(false);
+
+  // Biometric login remains available through its explicit button.
+  // Do not launch the biometric unlock UI automatically when the app opens;
+  // users should see the normal PIN screen first.
+  const [has2faOtpBeenSent, setHas2faOtpBeenSent] = useState(false);
+  const [login2faChannel, setLogin2faChannel] = useState<"email" | "whatsapp">("email");
+  const [login2faOtpDigits, setLogin2faOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [login2faCooldown, setLogin2faCooldown] = useState(0);
+  const [isSending2faOtp, setIsSending2faOtp] = useState(false);
+  const [isVerifying2faOtp, setIsVerifying2faOtp] = useState(false);
+  const [masked2faEmail, setMasked2faEmail] = useState("");
+  const [masked2faPhone, setMasked2faPhone] = useState("");
+  const login2faInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // 2FA Cooldown countdown timer
+  useEffect(() => {
+    if (login2faCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setLogin2faCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [login2faCooldown]);
+
+  const handleLogin2faOtpChange = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, "").slice(-1);
+    const updated = [...login2faOtpDigits];
+    updated[index] = digit;
+    setLogin2faOtpDigits(updated);
+
+    if (digit && index < 5) {
+      login2faInputRefs.current[index + 1]?.focus();
+    }
+
+    if (updated.join("").length === 6) {
+      executeVerify2faOtp(updated.join(""));
+    }
+  };
+
+  const handleLogin2faOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !login2faOtpDigits[index] && index > 0) {
+      login2faInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleLogin2faOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasteData) return;
+    const updated = ["", "", "", "", "", ""];
+    for (let i = 0; i < pasteData.length; i++) {
+      updated[i] = pasteData[i];
+    }
+    setLogin2faOtpDigits(updated);
+    const targetIdx = Math.min(pasteData.length, 5);
+    login2faInputRefs.current[targetIdx]?.focus();
+
+    if (updated.join("").length === 6) {
+      executeVerify2faOtp(updated.join(""));
+    }
+  };
+
+  const dispatch2faOtp = async (selectedChannel: "email" | "whatsapp" = login2faChannel) => {
+    if (!user) return;
+    setIsSending2faOtp(true);
+    toast.loading(`Sending 2FA OTP code via ${selectedChannel === "email" ? "Email" : "WhatsApp"}...`);
+
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/auth/login-2fa-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "send", channel: selectedChannel }),
+      });
+
+      toast.dismiss();
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast.success(data.message || "2FA OTP code sent!");
+        if (data.maskedEmail) setMasked2faEmail(data.maskedEmail);
+        if (data.maskedPhone) setMasked2faPhone(data.maskedPhone);
+        if (data.devOtp) toast.info(`Dev Mode OTP: ${data.devOtp}`);
+        setHas2faOtpBeenSent(true);
+        setLogin2faCooldown(60);
+      } else {
+        toast.error(data.error || "Failed to send 2FA OTP code.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Network error sending 2FA OTP code.");
+    } finally {
+      setIsSending2faOtp(false);
+    }
+  };
+
+  const executeVerify2faOtp = async (code: string) => {
+    if (!user || code.length !== 6) return;
+    setIsVerifying2faOtp(true);
+    toast.loading("Verifying 2FA OTP code...");
+
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/auth/login-2fa-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "verify", otp: code }),
+      });
+
+      toast.dismiss();
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setPinVerified(true);
+        toast.success("2FA Login Authenticated! Welcome back. 🛡️");
+        router.push("/");
+      } else {
+        toast.error(data.error || "Invalid 2FA OTP code.");
+        setLogin2faOtpDigits(["", "", "", "", "", ""]);
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Network error verifying 2FA OTP code.");
+    } finally {
+      setIsVerifying2faOtp(false);
+    }
+  };
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -418,6 +596,12 @@ export default function PinPage() {
       await delay(500);
 
       if (res.ok && data.success) {
+        if (userData?.is2faOtpEnabled === true) {
+          setIsVerifying(false);
+          setIs2faStage(true);
+          return;
+        }
+
         setPinVerified(true);
         toast.success("Identity verified");
         router.push("/");
@@ -435,6 +619,161 @@ export default function PinPage() {
   };
 
   if (loading) return null;
+
+  if (is2faStage) {
+    return (
+      <div className="flex flex-col min-h-screen bg-white p-6 md:p-8 items-center justify-between relative overflow-hidden font-hanken text-black">
+        {/* Top Brand Logo */}
+        <div className="w-full flex flex-col items-center text-center mt-6">
+          <div className="relative w-14 h-14 mb-3 flex items-center justify-center">
+            <AppLogo size={56} />
+          </div>
+          <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-Global Pay</h1>
+          <span className="px-3 py-1 bg-orange-50 border border-orange-200 text-[#FC7A00] font-black uppercase text-[10px] tracking-widest rounded-full shadow-2xs">
+            2FA Security Active
+          </span>
+        </div>
+
+        {/* Center 2FA OTP Card */}
+        <div className="w-full max-w-sm mx-auto flex flex-col items-center text-center space-y-5 my-6">
+          <div className="w-16 h-16 rounded-full bg-orange-50 border-2 border-orange-100 flex items-center justify-center text-[#FC7A00] shadow-sm animate-bounce-subtle">
+            <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>shield_lock</span>
+          </div>
+
+          <div className="space-y-1.5">
+            <h2 className="font-bodoni font-bold text-2xl text-black tracking-tight">2FA OTP Verification</h2>
+            <p className="font-hanken text-xs text-gray-500 font-semibold leading-relaxed max-w-xs mx-auto">
+              Access PIN verified! Please enter the 6-digit OTP code sent to{" "}
+              <span className="font-mono font-bold text-black">{login2faChannel === "email" ? (masked2faEmail || displayEmail) : (masked2faPhone || displayPhone)}</span>.
+            </p>
+          </div>
+
+          {/* Channel Selector Pills */}
+          <div className="space-y-2 w-full">
+            <p className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider text-left">Select Delivery Channel</p>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-2xl w-full border border-gray-200">
+              <button
+                type="button"
+                disabled={isSending2faOtp || login2faCooldown > 0}
+                onClick={() => {
+                  if (login2faCooldown > 0) return;
+                  setLogin2faChannel("email");
+                }}
+                className={cn(
+                  "py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5",
+                  login2faChannel === "email" ? "bg-[#FC7A00] text-white shadow-xs" : "bg-transparent text-gray-500 hover:text-black",
+                  login2faCooldown > 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                )}
+              >
+                <span className="material-symbols-outlined text-[16px]">mail</span>
+                <span>Email</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isSending2faOtp || login2faCooldown > 0}
+                onClick={() => {
+                  if (login2faCooldown > 0) return;
+                  setLogin2faChannel("whatsapp");
+                }}
+                className={cn(
+                  "py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5",
+                  login2faChannel === "whatsapp" ? "bg-emerald-600 text-white shadow-xs" : "bg-transparent text-gray-500 hover:text-black",
+                  login2faCooldown > 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                )}
+              >
+                <span className="material-symbols-outlined text-[16px]">chat</span>
+                <span>WhatsApp</span>
+              </button>
+            </div>
+            {login2faCooldown > 0 && (
+              <p className="text-[10px] text-amber-600 font-bold tracking-wide">Channel locked during active 60s cooldown</p>
+            )}
+          </div>
+
+          {/* Send OTP / Resend Timer Button */}
+          <div className="pt-1 w-full">
+            {!has2faOtpBeenSent ? (
+              <button
+                type="button"
+                disabled={isSending2faOtp}
+                onClick={() => dispatch2faOtp(login2faChannel)}
+                className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer disabled:opacity-50 transition-all shadow-xs"
+              >
+                {isSending2faOtp ? "Sending 2FA OTP Code..." : `Send OTP Code via ${login2faChannel === "email" ? "Email" : "WhatsApp"}`}
+              </button>
+            ) : (
+              <div className="space-y-4 w-full pt-2">
+                <p className="text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">Enter 6-Digit Security OTP</p>
+                <div className="flex gap-2 justify-center w-full">
+                  {[0, 1, 2, 3, 4, 5].map((idx) => (
+                    <input
+                      key={idx}
+                      ref={(el) => { login2faInputRefs.current[idx] = el; }}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={login2faOtpDigits[idx]}
+                      disabled={isVerifying2faOtp || isSending2faOtp}
+                      onChange={(e) => handleLogin2faOtpChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleLogin2faOtpKeyDown(idx, e)}
+                      onPaste={handleLogin2faOtpPaste}
+                      className={cn(
+                        "w-11 h-13 bg-white border-2 rounded-xl text-center font-mono font-black text-xl text-black transition-all outline-none shadow-xs",
+                        login2faOtpDigits[idx]
+                          ? "border-[#FC7A00] bg-orange-50/20 ring-2 ring-[#FC7A00]/20"
+                          : "border-gray-200 focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20"
+                      )}
+                    />
+                  ))}
+                </div>
+
+                {login2faCooldown > 0 ? (
+                  <p className="text-xs text-gray-400 font-bold">Resend code in {login2faCooldown}s</p>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isSending2faOtp}
+                    onClick={() => dispatch2faOtp(login2faChannel)}
+                    className="text-xs font-bold text-[#FC7A00] hover:underline cursor-pointer disabled:opacity-50 flex items-center gap-1.5 justify-center mx-auto uppercase tracking-wider"
+                  >
+                    {isSending2faOtp ? "Dispatching New Code..." : "Resend OTP Code"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Verify & Cancel Actions */}
+        <div className="w-full max-w-sm mx-auto flex flex-col gap-2.5 pb-6">
+          {has2faOtpBeenSent && (
+            <button
+              type="button"
+              disabled={isVerifying2faOtp || login2faOtpDigits.join("").length !== 6}
+              onClick={() => executeVerify2faOtp(login2faOtpDigits.join(""))}
+              className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer hover:brightness-105 active:scale-95 transition-all shadow-sm disabled:opacity-50"
+            >
+              {isVerifying2faOtp ? "Verifying 2FA Code..." : "Authenticate & Continue"}
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setIs2faStage(false);
+              setPin("");
+              setLogin2faOtpDigits(["", "", "", "", "", ""]);
+            }}
+            className="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase tracking-wider rounded-2xl transition-all cursor-pointer"
+          >
+            ← Return to Access PIN
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-white p-8 items-center justify-between relative overflow-hidden">
@@ -516,7 +855,17 @@ export default function PinPage() {
             {num}
           </motion.button>
         ))}
-        <div className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20" />
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          whileHover={{ scale: 1.05 }}
+          onClick={handleBiometricAuth}
+          className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-[#FC7A00] border border-gray-200 bg-orange-50/50 cursor-pointer transition-colors"
+          title={biometricLabel}
+        >
+          <span className="material-symbols-outlined text-[26px] min-[360px]:text-[30px] min-[410px]:text-3xl">
+            {biometricType === "faceid" ? "face_6" : "fingerprint"}
+          </span>
+        </motion.button>
         {keypadNumbers[9] !== undefined && (
           <motion.button
             whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
@@ -559,6 +908,74 @@ export default function PinPage() {
         onClose={() => setIsLogoutDrawerOpen(false)}
         onConfirm={handleLogOutFromPin}
       />
+
+      {/* Face ID / Biometrics Bottom Sheet Drawer */}
+      <AnimatePresence>
+        {showFaceIdModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowFaceIdModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100000]"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300, mass: 0.8 }}
+              drag="y"
+              dragDirectionLock
+              dragConstraints={{ top: 0, bottom: 400 }}
+              dragElastic={{ top: 0, bottom: 0.2 }}
+              onDragEnd={(_event, info) => {
+                if (info.offset.y > 100 || info.velocity.y > 500) {
+                  setShowFaceIdModal(false);
+                }
+              }}
+              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[28px] border-t border-gray-200 p-6 pb-8 z-[100001] flex flex-col items-center select-none cursor-default shadow-none font-hanken"
+            >
+              {/* Draggable handle bar */}
+              <div className="w-10 h-1 bg-gray-300 rounded-full mb-4 cursor-grab active:cursor-grabbing" />
+
+              {/* Drawer Header */}
+              <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+                <div className="w-8" />
+                <h2 className="font-hanken font-bold text-base text-black text-center">
+                  {biometricLabel} Authentication
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowFaceIdModal(false)}
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                </button>
+              </div>
+
+              {/* Icon & Badge */}
+              <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center mb-3 shadow-inner">
+                <span className="material-symbols-outlined text-[36px] font-bold">
+                  {biometricType === "faceid" ? "face_6" : "fingerprint"}
+                </span>
+              </div>
+
+              <p className="font-hanken text-xs text-gray-500 text-center max-w-[290px] mb-6 leading-relaxed font-medium">
+                Enable &quot;{biometricLabel} for Login&quot; in Security Settings to use {biometricLabel} directly instead of entering your Access PIN.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setShowFaceIdModal(false)}
+                className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer border-0"
+              >
+                Got It
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Full-Screen Hardware-Accelerated Overlay for Forgot PIN recovery */}
       <AnimatePresence>

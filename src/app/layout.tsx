@@ -7,6 +7,7 @@ import { Toaster } from "sonner";
 import { RouteGuard } from "@/components/RouteGuard";
 import { OfflineDrawer } from "@/components/layout/OfflineDrawer";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { BiometricPromptModal } from "@/components/BiometricPromptModal";
 
 const bodoniModa = Bodoni_Moda({
   subsets: ["latin"],
@@ -87,6 +88,7 @@ export default function RootLayout({
             </RouteGuard>
             <OfflineDrawer />
             <ServiceWorkerRegister />
+            <BiometricPromptModal />
           <Toaster
             position="top-center"
             style={{ top: "32px" }}

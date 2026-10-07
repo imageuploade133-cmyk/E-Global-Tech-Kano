@@ -254,8 +254,8 @@ export default function InvestmentPage() {
     setShowPinModal(true);
   };
 
-  // Execute Creation with PIN
-  const handleExecuteInvestmentWithPin = async (pin: string) => {
+  // Execute Creation with PIN / Biometric
+  const handleExecuteInvestmentWithPin = async (pin?: string, isBiometricAuthenticated?: boolean) => {
     setIsSubmitting(true);
     const amt = parseFloat(amountStr) || 0;
 
@@ -285,6 +285,7 @@ export default function InvestmentPage() {
           durationDays: calculatedLockDays,
           idempotencyKey,
           pin,
+          isBiometricAuthenticated,
         })
       });
 
@@ -312,8 +313,8 @@ export default function InvestmentPage() {
     setShowPinModal(true);
   };
 
-  // Execute Claim with PIN
-  const handleExecuteClaimWithPin = async (pin: string) => {
+  // Execute Claim with PIN / Biometric
+  const handleExecuteClaimWithPin = async (pin?: string, isBiometricAuthenticated?: boolean) => {
     if (!selectedClaimId) return;
     setIsSubmitting(true);
 
@@ -326,7 +327,7 @@ export default function InvestmentPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ pin, isBiometricAuthenticated }),
       });
 
       const data = await res.json();
@@ -525,13 +526,13 @@ export default function InvestmentPage() {
           isOpen={showPinModal}
           onClose={() => setShowPinModal(false)}
           title={pinAction === "CREATE" ? "Authorize Savings Lock" : "Authorize Payout Request"}
-          description={pinAction === "CREATE" ? "Enter 4-digit PIN to confirm and lock funds." : "Enter 4-digit PIN to submit payout request."}
+          description={pinAction === "CREATE" ? "Enter 4-digit PIN or biometrics to confirm and lock funds." : "Enter 4-digit PIN or biometrics to submit payout request."}
           isSubmitting={isSubmitting}
-          onPinSubmit={(pin) => {
+          onPinSubmit={(pin, isBiometric) => {
             if (pinAction === "CREATE") {
-              handleExecuteInvestmentWithPin(pin);
+              handleExecuteInvestmentWithPin(pin, isBiometric);
             } else {
-              handleExecuteClaimWithPin(pin);
+              handleExecuteClaimWithPin(pin, isBiometric);
             }
           }}
         />

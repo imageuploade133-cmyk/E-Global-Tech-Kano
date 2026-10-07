@@ -49,11 +49,13 @@ export async function POST(req: Request) {
 
     const trfRecipients = (recipients || bulk_data) as BulkRecipient[] | undefined;
 
+    const isBiometricReq = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
     // Validations
     if (!trfRecipients || !Array.isArray(trfRecipients) || trfRecipients.length === 0) {
       return NextResponse.json({ error: "A list of transfer recipients is required." }, { status: 400 });
     }
-    if (!pin) {
+    if (!isBiometricReq && !pin) {
       return NextResponse.json({ error: "Transaction PIN is required to authorize bulk transfers." }, { status: 400 });
     }
 
@@ -128,11 +130,16 @@ export async function POST(req: Request) {
       }
 
       let isPinMatch = false;
-      if (isMock) {
-        isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
-      } else if (pinHash) {
+      const isUserBiometricEnabled = userData.isBiometricTransferEnabled === true || userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
+      const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
+      if (isBiometricAuth && isUserBiometricEnabled) {
+        isPinMatch = true;
+      } else if (isMock) {
+        isPinMatch = (pin === "1234" || (Boolean(pin) && pin === currentPlainPin) || (pinHash && Boolean(pin) && bcrypt.compareSync(pin!, pinHash)));
+      } else if (pin && pinHash) {
         isPinMatch = bcrypt.compareSync(pin, pinHash);
-      } else if (currentPlainPin) {
+      } else if (pin && currentPlainPin) {
         isPinMatch = (pin === currentPlainPin);
       } else {
         return {
@@ -508,6 +515,6 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[Bulk Transfer API Exception]:", error.message, error.stack);
-    return NextResponse.json({ error: "Internal processing error occurred while executing bulk transfer." }, { status: 500 });
+    return NextResponse.json({ error: "Unable to complete bulk transfer at this time. If your transaction amount exceeds your account Tier limit, please upgrade your Tier or contact Support for assistance." }, { status: 500 });
   }
 }

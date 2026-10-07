@@ -17,6 +17,7 @@ import { ProfileHeaderSection } from "@/components/profile/ProfileHeaderSection"
 import { ReferralSection } from "@/components/profile/ReferralSection";
 import { KycStatusSection } from "@/components/profile/KycStatusSection";
 import { SecuritySettingsSection } from "@/components/profile/SecuritySettingsSection";
+import { registerBiometricCredential, getBiometricLabel, authenticateBiometricDetailed } from "@/lib/biometrics-util";
 import { TransferLimitsSection } from "@/components/profile/TransferLimitsSection";
 import { ChangePinSection } from "@/components/profile/ChangePinSection";
 import { ChangePasswordSection } from "@/components/profile/ChangePasswordSection";
@@ -70,6 +71,9 @@ export default function ProfilePage() {
   // Security Toggles State
   const isPinRequired = userData?.isPinRequired !== false;
   const isFaceIdEnabled = userData?.isFaceIdEnabled === true;
+  const is2faOtpEnabled = userData?.is2faOtpEnabled === true;
+  const isBiometricLoginEnabled = userData?.isBiometricLoginEnabled === true;
+  const isBiometricTransferEnabled = userData?.isBiometricTransferEnabled === true;
   const dailyLimit = userData?.dailyLimit ?? 500000;
 
   // Resolve or retrieve the permanent static account details if verified
@@ -185,12 +189,154 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSelectLimitCategory = async (limit: number) => {
+  const handleToggle2faOtp = async (enteredPin: string): Promise<boolean> => {
     try {
-      await updateUserData({ dailyLimit: limit });
-      toast.success(`Daily limit set to ₦${new Intl.NumberFormat("en-NG").format(limit)}`);
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      // Verify 4-digit Access PIN first
+      const verifyRes = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "verify", pin: enteredPin }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || !verifyData.success) {
+        toast.error(verifyData.error || "Invalid Access PIN.");
+        return false;
+      }
+
+      const targetState = !is2faOtpEnabled;
+      await updateUserData({ is2faOtpEnabled: targetState });
+      toast.success(targetState ? "2FA Login OTP Verification Enabled! 🛡️" : "2FA Login OTP Verification Disabled");
+      return true;
     } catch {
-      toast.error("Failed to update transfer limit");
+      toast.error("Failed to update 2FA state");
+      return false;
+    }
+  };
+
+  const handleToggleBiometricLogin = async (enteredPin: string): Promise<boolean> => {
+    try {
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      const verifyRes = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "verify", pin: enteredPin }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || !verifyData.success) {
+        toast.error(verifyData.error || "Invalid Access PIN.");
+        return false;
+      }
+
+      const bioLabel = getBiometricLabel();
+      const targetState = !isBiometricLoginEnabled;
+
+      if (targetState) {
+        triggerHaptic();
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+          navigator.vibrate([100, 50, 100]);
+        }
+        toast.loading(`Scan ${bioLabel} sensor to authorize enablement...`);
+        const authRes = await authenticateBiometricDetailed(`Enable ${bioLabel} Login`);
+        toast.dismiss();
+
+        if (!authRes.success) {
+          if (authRes.cancelled) {
+            toast.info(`${bioLabel} verification cancelled. Biometrics remained disabled.`);
+          } else {
+            toast.error(authRes.message || `${bioLabel} verification failed.`);
+          }
+          return false;
+        }
+
+        const regResult = await registerBiometricCredential(userEmail);
+        if (!regResult.success) {
+          toast.error(regResult.message || `${bioLabel} registration failed.`);
+          return false;
+        }
+      }
+
+      await updateUserData({ isBiometricLoginEnabled: targetState, isFaceIdEnabled: targetState });
+      toast.success(targetState ? `${bioLabel} Login Enabled! 🔓` : `${bioLabel} Login Disabled`);
+      return true;
+    } catch {
+      toast.error("Failed to update Biometric Login state");
+      return false;
+    }
+  };
+
+  const handleToggleBiometricTransfer = async (enteredPin: string): Promise<boolean> => {
+    try {
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      const verifyRes = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "verify", pin: enteredPin }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || !verifyData.success) {
+        toast.error(verifyData.error || "Invalid Access PIN.");
+        return false;
+      }
+
+      const bioLabel = getBiometricLabel();
+      const targetState = !isBiometricTransferEnabled;
+
+      if (targetState) {
+        triggerHaptic();
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+          navigator.vibrate([100, 50, 100]);
+        }
+        toast.loading(`Scan ${bioLabel} sensor to authorize enablement...`);
+        const authRes = await authenticateBiometricDetailed(`Enable ${bioLabel} Transfers`);
+        toast.dismiss();
+
+        if (!authRes.success) {
+          if (authRes.cancelled) {
+            toast.info(`${bioLabel} verification cancelled. Biometrics remained disabled.`);
+          } else {
+            toast.error(authRes.message || `${bioLabel} verification failed.`);
+          }
+          return false;
+        }
+
+        const regResult = await registerBiometricCredential(userEmail);
+        if (!regResult.success) {
+          toast.error(regResult.message || `${bioLabel} registration failed.`);
+          return false;
+        }
+      }
+
+      await updateUserData({ isBiometricTransferEnabled: targetState });
+      toast.success(targetState ? `${bioLabel} Transfer Enabled! ⚡` : `${bioLabel} Transfer Disabled`);
+      return true;
+    } catch {
+      toast.error("Failed to update Biometric Transfer state");
+      return false;
     }
   };
 
@@ -243,14 +389,19 @@ export default function ProfilePage() {
           <SecuritySettingsSection
             isPinRequired={isPinRequired}
             isFaceIdEnabled={isFaceIdEnabled}
+            is2faOtpEnabled={is2faOtpEnabled}
+            isBiometricLoginEnabled={isBiometricLoginEnabled}
+            isBiometricTransferEnabled={isBiometricTransferEnabled}
             onTogglePinRequired={handleTogglePinRequired}
             onToggleFaceId={handleToggleFaceId}
+            onToggle2faOtp={handleToggle2faOtp}
+            onToggleBiometricLogin={handleToggleBiometricLogin}
+            onToggleBiometricTransfer={handleToggleBiometricTransfer}
           />
 
           {/* Section: Daily Transfer Limit */}
           <TransferLimitsSection
             dailyLimit={dailyLimit}
-            onSelectLimitCategory={handleSelectLimitCategory}
           />
 
           {/* Section: Change Access PIN Form */}

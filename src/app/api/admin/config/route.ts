@@ -1,6 +1,18 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
+import { NotificationService } from "@/services/notification-service";
+
+/**
+ * Server-side config sanitization helper.
+ * Strictly strips sensitive secret keys (e.g. imgbbApiKey) from any config object
+ * before returning it to browser clients.
+ */
+function sanitizeConfigDoc<T extends Record<string, any>>(config: T): T {
+  if (!config || typeof config !== "object") return config;
+  const { imgbbApiKey, secretKey, apiKey, ...sanitized } = config;
+  return sanitized as T;
+}
 
 export async function GET(req: Request) {
   try {
@@ -24,9 +36,12 @@ export async function GET(req: Request) {
     let totalUsers = 0;
     let globalNgnBalance = 0;
     let globalUsdBalance = 0;
+    let globalXofBalance = 0;
     let totalFixedDeposit = 0;
     let todayDeposit = 0;
     let todayTransfer = 0;
+    let todayPayout = 0;
+    let todayNetFlow = 0;
     let totalAirtimePurchase = 0;
     let totalBonus = 0;
 
@@ -38,31 +53,30 @@ export async function GET(req: Request) {
       console.warn("[Admin Config GET API] users count aggregation failed:", err.message);
     }
 
-    // B. Calculate global NGN balance from NGN wallets
+    // B. Calculate global NGN, USD, XOF pool balances and Bonus balances from wallets
     try {
-      const ngnWalletsSnap = await adminDb.collection("wallets")
-        .where("currency", "==", "NGN")
-        .get();
-      ngnWalletsSnap.forEach((doc) => {
-        globalNgnBalance += Number(doc.data().balance) || 0;
+      const walletsSnap = await adminDb.collection("wallets").get();
+      walletsSnap.forEach((doc) => {
+        const data = doc.data() || {};
+        const currency = String(data.currency || "").toUpperCase();
+        const bal = Number(data.balance) || 0;
+        const bonus = Number(data.bonusBalance) || 0;
+
+        if (currency === "NGN" || doc.id.endsWith("_NGN")) {
+          globalNgnBalance += bal;
+        } else if (currency === "USD" || doc.id.endsWith("_USD")) {
+          globalUsdBalance += bal;
+        } else if (currency === "XOF" || doc.id.endsWith("_XOF")) {
+          globalXofBalance += bal;
+        }
+
+        totalBonus += bonus;
       });
     } catch (err: any) {
-      console.warn("[Admin Config GET API] NGN wallets sum failed:", err.message);
+      console.warn("[Admin Config GET API] Wallets sum failed:", err.message);
     }
 
-    // C. Calculate global USD balance from USD wallets
-    try {
-      const usdWalletsSnap = await adminDb.collection("wallets")
-        .where("currency", "==", "USD")
-        .get();
-      usdWalletsSnap.forEach((doc) => {
-        globalUsdBalance += Number(doc.data().balance) || 0;
-      });
-    } catch (err: any) {
-      console.warn("[Admin Config GET API] USD wallets sum failed:", err.message);
-    }
-
-    // D. Sum active fixed deposits
+    // C. Sum active fixed deposits
     try {
       const activeInvestmentsSnap = await adminDb.collection("investments")
         .where("status", "==", "ACTIVE")
@@ -77,7 +91,7 @@ export async function GET(req: Request) {
       console.warn("[Admin Config GET API] active fixed deposits sum failed:", err.message);
     }
 
-    // E. Sum today's transactions (deposits and transfers)
+    // D. Sum today's transactions (deposits, transfers, payouts, net flow)
     try {
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
@@ -86,22 +100,31 @@ export async function GET(req: Request) {
         .where("createdAt", ">=", startOfToday.toISOString())
         .get();
 
+      const payoutTypes = ["TRANSFER", "WITHDRAWAL", "CASHOUT", "AIRTIME", "DATA", "BILLS", "UTILITY", "CABLE", "ELECTRICITY", "STORE_PURCHASE", "CARD_FUND"];
+      const depositTypes = ["DEPOSIT", "VIRTUAL_ACCOUNT_DEPOSIT", "WALLET_FUNDING"];
+
       todayTxSnap.forEach((doc) => {
-        const data = doc.data();
-        const amt = Number(data.amount) || 0;
+        const data = doc.data() || {};
+        const debitedAmt = Number(data.totalDebited) || Number(data.amount) || 0;
+        const creditedAmt = Number(data.totalCredited) || Number(data.amount) || 0;
+
         if (data.status === "SUCCESS") {
-          if (data.type === "DEPOSIT") {
-            todayDeposit += amt;
-          } else if (data.type === "TRANSFER") {
-            todayTransfer += amt;
+          if (depositTypes.includes(data.type) || (data.direction === "CREDIT" && data.type !== "REFUND")) {
+            todayDeposit += creditedAmt;
+          } else if (payoutTypes.includes(data.type) || data.direction === "DEBIT") {
+            todayPayout += debitedAmt;
+            if (data.type === "TRANSFER") {
+              todayTransfer += debitedAmt;
+            }
           }
         }
       });
+      todayNetFlow = todayDeposit - todayPayout;
     } catch (err: any) {
       console.warn("[Admin Config GET API] today's transactions sum failed:", err.message);
     }
 
-    // F. Sum total successful airtime purchases
+    // E. Sum total successful airtime purchases
     try {
       const airtimeTxSnap = await adminDb.collection("transactions")
         .where("type", "==", "AIRTIME")
@@ -112,16 +135,6 @@ export async function GET(req: Request) {
       });
     } catch (err: any) {
       console.warn("[Admin Config GET API] airtime purchases sum failed:", err.message);
-    }
-
-    // G. Sum total bonus wallet balance from wallets
-    try {
-      const walletsSnap = await adminDb.collection("wallets").get();
-      walletsSnap.forEach((doc) => {
-        totalBonus += Number(doc.data().bonusBalance) || 0;
-      });
-    } catch (err: any) {
-      console.warn("[Admin Config GET API] total bonus sum failed:", err.message);
     }
 
     // H. Low-Cost Aggregations for Transfer Profit and Data Profit (Uses count() aggregation: 1 read per 1,000 txs)
@@ -159,22 +172,52 @@ export async function GET(req: Request) {
       console.warn("[Admin Config GET API] profit aggregation failed:", err.message);
     }
 
+    let hasCustomImgbbApiKey = false;
+    try {
+      const secretsSnap = await adminDb.collection("config").doc("app_secrets").get();
+      if (secretsSnap.exists && secretsSnap.data()?.imgbbApiKey) {
+        hasCustomImgbbApiKey = Boolean(
+          typeof secretsSnap.data()?.imgbbApiKey === "string" &&
+          secretsSnap.data()?.imgbbApiKey.trim().length > 0
+        );
+      } else {
+        hasCustomImgbbApiKey = Boolean(
+          baseConfig.imgbbApiKey &&
+          typeof baseConfig.imgbbApiKey === "string" &&
+          baseConfig.imgbbApiKey.trim().length > 0
+        );
+      }
+    } catch {
+      hasCustomImgbbApiKey = Boolean(
+        baseConfig.imgbbApiKey &&
+        typeof baseConfig.imgbbApiKey === "string" &&
+        baseConfig.imgbbApiKey.trim().length > 0
+      );
+    }
+
     // 3. Compile and merge aggregated values into config object
     const mergedConfig = {
       ...baseConfig,
+      hasCustomImgbbApiKey,
       totalUsers,
       globalNgnBalance,
       globalUsdBalance,
+      globalXofBalance,
       totalFixedDeposit,
       todayDeposit,
       todayTransfer,
+      todayPayout,
+      todayNetFlow,
       totalAirtimePurchase,
       totalBonus,
       totalTransferProfit,
       totalDataProfit,
     };
 
-    return NextResponse.json({ success: true, config: mergedConfig });
+    // REQUIREMENT 3 & 4: Ensure raw imgbbApiKey is NEVER returned to browser clients
+    const safeConfig = sanitizeConfigDoc(mergedConfig);
+
+    return NextResponse.json({ success: true, config: safeConfig });
   } catch (err: any) {
     console.error("[Admin Config GET API] Exception:", err.message);
     return NextResponse.json({ error: "Unauthorized or server exception", details: err.message }, { status: 401 });
@@ -188,18 +231,91 @@ export async function POST(req: Request) {
       return perm.response!;
     }
 
-    const updates = await req.json();
+    const updates = await req.json() || {};
 
-    // Secure Firestore write with await - wait for Firestore to confirm success before returning success
-    await adminDb.collection("config").doc("app").set(updates, { merge: true });
+    // Check if custom ImgBB API key is being updated or explicitly cleared
+    let customImgbbApiKeyUpdate: string | undefined = undefined;
+    let shouldClearImgbbApiKey = false;
+
+    if ("imgbbApiKey" in updates) {
+      const val = updates.imgbbApiKey;
+      if (val === "" || val === null || updates.clearImgbbApiKey === true) {
+        shouldClearImgbbApiKey = true;
+      } else if (typeof val === "string" && val.trim().length > 0 && val.trim() !== "••••••••") {
+        customImgbbApiKeyUpdate = val.trim();
+      }
+    } else if (updates.clearImgbbApiKey === true) {
+      shouldClearImgbbApiKey = true;
+    }
+
+    // Sanitize non-sensitive updates for client response / config save
+    const sanitizedUpdates = (updates && typeof updates === "object")
+      ? sanitizeConfigDoc(updates)
+      : updates;
+
+    delete (sanitizedUpdates as any).clearImgbbApiKey;
+
+    // Fetch previous app version before committing updates
+    let oldAppVersion = "";
+    try {
+      const prevDocSnap = await adminDb.collection("config").doc("app").get();
+      if (prevDocSnap.exists) {
+        oldAppVersion = (prevDocSnap.data()?.appVersion || "").trim();
+      }
+    } catch {
+      // Ignore read failure
+    }
+
+    // Secure Firestore write with await
+    await adminDb.collection("config").doc("app").set(sanitizedUpdates, { merge: true });
+
+    // Check if appVersion was updated to a new version, and broadcast push notifications to users if enabled
+    const newAppVersion = typeof sanitizedUpdates?.appVersion === "string" ? sanitizedUpdates.appVersion.trim() : "";
+    const isPushNotificationEnabled = sanitizedUpdates?.appVersionPushNotificationEnabled !== false;
+
+    if (newAppVersion && newAppVersion !== oldAppVersion && isPushNotificationEnabled) {
+      await NotificationService.broadcastAppUpdateNotification(newAppVersion).catch((err) => {
+        console.error("[Admin Config POST] Broadcast update notification error:", err?.message || err);
+      });
+    }
+
+    // Handle ImgBB API Key updates securely in admin-isolated config/app_secrets
+    if (customImgbbApiKeyUpdate) {
+      await adminDb.collection("config").doc("app_secrets").set({ imgbbApiKey: customImgbbApiKeyUpdate, updatedAt: new Date().toISOString() }, { merge: true });
+      await adminDb.collection("config").doc("app").set({ hasCustomImgbbApiKey: true, imgbbApiKey: "" }, { merge: true });
+    } else if (shouldClearImgbbApiKey) {
+      await adminDb.collection("config").doc("app_secrets").set({ imgbbApiKey: "", updatedAt: new Date().toISOString() }, { merge: true });
+      await adminDb.collection("config").doc("app").set({ hasCustomImgbbApiKey: false, imgbbApiKey: "" }, { merge: true });
+    }
 
     // Fetch the updated document to return authoritative server data
     const updatedDoc = await adminDb.collection("config").doc("app").get();
+    const updatedData = updatedDoc.data() || {};
+
+    let hasCustomImgbbApiKey = false;
+    try {
+      const secretsSnap = await adminDb.collection("config").doc("app_secrets").get();
+      if (secretsSnap.exists && secretsSnap.data()?.imgbbApiKey) {
+        hasCustomImgbbApiKey = Boolean(
+          typeof secretsSnap.data()?.imgbbApiKey === "string" &&
+          secretsSnap.data()?.imgbbApiKey.trim().length > 0
+        );
+      } else {
+        hasCustomImgbbApiKey = Boolean(updatedData.hasCustomImgbbApiKey);
+      }
+    } catch {
+      hasCustomImgbbApiKey = Boolean(updatedData.hasCustomImgbbApiKey);
+    }
+
+    const safeUpdatedConfig = {
+      ...sanitizeConfigDoc(updatedData),
+      hasCustomImgbbApiKey,
+    };
 
     return NextResponse.json({
       success: true,
       message: "Branding and app configuration updated successfully!",
-      config: updatedDoc.data()
+      config: safeUpdatedConfig,
     });
   } catch (err: any) {
     console.error("[Admin Config POST API] Error:", err.message);

@@ -1,7 +1,7 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { getMessaging } from "firebase-admin/messaging";
 
-export type NotificationType = "transaction" | "security" | "promo";
+export type NotificationType = "transaction" | "security" | "promo" | "system" | "order" | "chat";
 
 export interface NotificationPayload {
   title: string;
@@ -299,6 +299,296 @@ export class NotificationService {
         // Notification failure must never affect the financial transaction.
       }
       console.error("[NotificationService] Reversal notification dispatch failed:", err?.message || err);
+    }
+  }
+
+  /**
+   * Broadcasts a real-time FCM push notification to all active users when an administrator releases a new app version.
+   */
+  public static async broadcastAppUpdateNotification(newVersion: string): Promise<number> {
+    if (!adminDb) return 0;
+    try {
+      const tokensSnap = await adminDb.collection("fcm_tokens").get();
+      if (tokensSnap.empty) return 0;
+
+      const title = "🚀 New Update Available!";
+      const body = `Version ${newVersion} has been released. Tap to update now for new features and performance enhancements!`;
+
+      const messaging = getMessaging();
+      const tokenDocs = tokensSnap.docs
+        .map(docSnap => {
+          const data = docSnap.data() as { token?: string; userId?: string; [key: string]: any };
+          return { id: docSnap.id, ...data };
+        })
+        .filter(t => Boolean(t.token));
+
+      if (tokenDocs.length === 0) return 0;
+
+      let sentCount = 0;
+      const invalidTokenIds: string[] = [];
+      const affectedUserIds = new Set<string>();
+
+      // Dispatch FCM push messages concurrently using Promise.allSettled
+      const sendPromises = tokenDocs.map(async (tDoc) => {
+        try {
+          const message = {
+            token: tDoc.token!,
+            notification: { title, body },
+            data: {
+              title,
+              body,
+              type: "system",
+              version: newVersion,
+              url: "/",
+            },
+            android: {
+              priority: "high" as const,
+              notification: {
+                sound: "default",
+                channelId: "eglobal_wallet_high_channel",
+              },
+            },
+            apns: {
+              payload: {
+                aps: {
+                  alert: { title, body },
+                  sound: "default",
+                  badge: 1,
+                },
+              },
+            },
+            webpush: {
+              headers: { Urgency: "high" },
+              notification: {
+                icon: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+                badge: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+              },
+            },
+          };
+
+          await messaging.send(message);
+          sentCount++;
+          if (tDoc.userId) affectedUserIds.add(tDoc.userId);
+        } catch (fcmErr: any) {
+          const errMsg = fcmErr.message || "";
+          if (
+            fcmErr.code === "messaging/invalid-registration-token" ||
+            fcmErr.code === "messaging/registration-token-not-registered" ||
+            errMsg.includes("not-registered") ||
+            errMsg.includes("invalid-registration-token")
+          ) {
+            invalidTokenIds.push(tDoc.id);
+          }
+        }
+      });
+
+      await Promise.allSettled(sendPromises);
+
+      // Save notification to affected user notification inboxes
+      if (affectedUserIds.size > 0 && adminDb) {
+        const nowIso = new Date().toISOString();
+        const savePromises = Array.from(affectedUserIds).map((uid) => {
+          return adminDb!
+            .collection("users")
+            .doc(uid)
+            .collection("notifications")
+            .doc(`app-update-${newVersion}`)
+            .set({
+              title,
+              body,
+              message: body,
+              type: "system",
+              read: false,
+              createdAt: nowIso,
+              version: newVersion,
+            }, { merge: true })
+            .catch(() => {});
+        });
+        await Promise.allSettled(savePromises);
+      }
+
+      if (invalidTokenIds.length > 0 && adminDb) {
+        const batch = adminDb.batch();
+        invalidTokenIds.forEach(id => batch.delete(adminDb!.collection("fcm_tokens").doc(id)));
+        await batch.commit().catch(() => {});
+      }
+
+      console.log(`[NotificationService] App update v${newVersion} push notification broadcasted to ${sentCount} device(s).`);
+      return sentCount;
+    } catch (err: any) {
+      console.error("[NotificationService] Failed to broadcast app update notification:", err.message);
+      return 0;
+    }
+  }
+
+  /**
+   * Broadcasts an administrative push notification (with optional banner image URL, action URL, and type)
+   * to all active tokens or a specific target user, saving the notification in user inboxes and returning send metrics.
+   */
+  public static async sendAdminBroadcastNotification(params: {
+    target: "all" | "user";
+    targetUserId?: string;
+    title: string;
+    body: string;
+    type?: NotificationType;
+    imageUrl?: string;
+    url?: string;
+    adminEmail?: string;
+  }): Promise<{ sentCount: number; targetCount: number; errorsCount: number }> {
+    if (!adminDb) return { sentCount: 0, targetCount: 0, errorsCount: 0 };
+
+    try {
+      const { target, targetUserId, title, body, type = "promo", imageUrl = "", url = "", adminEmail = "" } = params;
+
+      let tokenDocs: { id: string; token: string; userId?: string }[] = [];
+
+      if (target === "user" && targetUserId) {
+        const snap = await adminDb.collection("fcm_tokens").where("userId", "==", targetUserId).get();
+        tokenDocs = snap.docs
+          .map(d => ({ id: d.id, ...(d.data() as { token?: string; userId?: string }) }))
+          .filter(t => Boolean(t.token)) as any;
+      } else {
+        const snap = await adminDb.collection("fcm_tokens").get();
+        tokenDocs = snap.docs
+          .map(d => ({ id: d.id, ...(d.data() as { token?: string; userId?: string }) }))
+          .filter(t => Boolean(t.token)) as any;
+      }
+
+      if (tokenDocs.length === 0) {
+        return { sentCount: 0, targetCount: 0, errorsCount: 0 };
+      }
+
+      const messaging = getMessaging();
+      let sentCount = 0;
+      let errorsCount = 0;
+      const invalidTokenIds: string[] = [];
+      const affectedUserIds = new Set<string>();
+
+      const sendPromises = tokenDocs.map(async (tDoc) => {
+        try {
+          const message = {
+            token: tDoc.token,
+            notification: {
+              title,
+              body,
+              ...(imageUrl ? { image: imageUrl } : {}),
+            },
+            data: {
+              title,
+              body,
+              type,
+              image: imageUrl,
+              imageUrl,
+              bannerUrl: imageUrl,
+              url: url || "/",
+              click_action: url || "/",
+            },
+            android: {
+              priority: "high" as const,
+              notification: {
+                sound: "default",
+                channelId: "eglobal_wallet_high_channel",
+                clickAction: "FLUTTER_NOTIFICATION_CLICK",
+                ...(imageUrl ? { imageUrl } : {}),
+              },
+            },
+            apns: {
+              payload: {
+                aps: {
+                  alert: { title, body },
+                  sound: "default",
+                  badge: 1,
+                  ...(imageUrl ? { "mutable-content": 1 } : {}),
+                },
+              },
+              ...(imageUrl ? { fcm_options: { image: imageUrl } } : {}),
+            },
+            webpush: {
+              headers: { Urgency: "high" },
+              notification: {
+                icon: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+                badge: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+                ...(imageUrl ? { image: imageUrl } : {}),
+              },
+              fcmOptions: {
+                ...(url ? { link: url } : {}),
+              },
+            },
+          };
+
+          await messaging.send(message);
+          sentCount++;
+          if (tDoc.userId) affectedUserIds.add(tDoc.userId);
+        } catch (fcmErr: any) {
+          errorsCount++;
+          const errMsg = fcmErr.message || "";
+          if (
+            fcmErr.code === "messaging/invalid-registration-token" ||
+            fcmErr.code === "messaging/registration-token-not-registered" ||
+            errMsg.includes("not-registered") ||
+            errMsg.includes("invalid-registration-token")
+          ) {
+            invalidTokenIds.push(tDoc.id);
+          }
+        }
+      });
+
+      await Promise.allSettled(sendPromises);
+
+      // Save notification to affected user notification inboxes in Firestore
+      if (affectedUserIds.size > 0 && adminDb) {
+        const nowIso = new Date().toISOString();
+        const savePromises = Array.from(affectedUserIds).map((uid) => {
+          return adminDb!
+            .collection("users")
+            .doc(uid)
+            .collection("notifications")
+            .doc()
+            .set({
+              title,
+              body,
+              message: body,
+              type,
+              read: false,
+              createdAt: nowIso,
+              imageUrl,
+              bannerUrl: imageUrl,
+              url,
+            })
+            .catch(() => {});
+        });
+        await Promise.allSettled(savePromises);
+      }
+
+      // Cleanup invalid tokens
+      if (invalidTokenIds.length > 0 && adminDb) {
+        const batch = adminDb.batch();
+        invalidTokenIds.forEach(id => batch.delete(adminDb!.collection("fcm_tokens").doc(id)));
+        await batch.commit().catch(() => {});
+      }
+
+      // Record audit entry in admin_push_notifications
+      const logRef = adminDb.collection("admin_push_notifications").doc();
+      await logRef.set({
+        id: logRef.id,
+        title,
+        body,
+        type,
+        imageUrl,
+        url,
+        target,
+        targetUserId: targetUserId || null,
+        sentCount,
+        errorsCount,
+        targetCount: tokenDocs.length,
+        adminEmail,
+        createdAt: new Date().toISOString(),
+      });
+
+      return { sentCount, targetCount: tokenDocs.length, errorsCount };
+    } catch (err: any) {
+      console.error("[NotificationService] Admin push broadcast failed:", err.message);
+      return { sentCount: 0, targetCount: 0, errorsCount: 1 };
     }
   }
 }

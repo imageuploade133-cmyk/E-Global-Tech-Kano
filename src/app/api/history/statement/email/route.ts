@@ -40,12 +40,13 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { fromDate, toDate, pin } = body;
+    const isBiometricReq = body.isBiometricAuthenticated === true || body.isBiometric === true;
 
     if (!fromDate || !toDate) {
       return NextResponse.json({ error: "Please select both From Date and To Date." }, { status: 400 });
     }
 
-    if (!pin || typeof pin !== "string" || pin.length !== 4 || isNaN(Number(pin))) {
+    if (!isBiometricReq && (!pin || typeof pin !== "string" || pin.length !== 4 || isNaN(Number(pin)))) {
       return NextResponse.json({ error: "4-digit transaction PIN is required to generate statement." }, { status: 400 });
     }
 
@@ -108,7 +109,12 @@ export async function POST(req: Request) {
     const currentPlainPin = userData.pin;
 
     let isPinMatch = false;
-    if (pinHash) {
+    const isUserBiometricEnabled = userData.isBiometricTransferEnabled === true || userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
+    const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
+    if (isBiometricAuth && isUserBiometricEnabled) {
+      isPinMatch = true;
+    } else if (pinHash) {
       isPinMatch = bcrypt.compareSync(pin, pinHash);
     } else if (currentPlainPin) {
       isPinMatch = (pin === currentPlainPin);

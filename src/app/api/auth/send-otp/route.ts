@@ -120,14 +120,16 @@ export async function POST(req: Request) {
       }
     }
 
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
 
     const response = await fetch(`${GATEWAY_URL}/api/auth/send-otp`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": gatewayApiKey,
-      },
+      headers,
       body: JSON.stringify({
         phoneNumber: fullPhoneNumber,
         type: "signup"

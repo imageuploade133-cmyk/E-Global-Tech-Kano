@@ -10,12 +10,15 @@ import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
+import { TierUpgradeDrawerModal } from "@/components/profile/TransferLimitsSection";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { AppLogo } from "@/components/AppLogo";
 import { FeatureDisabledBanner } from "@/components/FeatureDisabledBanner";
 import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggle";
 import { triggerHaptic } from "@/lib/haptics";
+import { TwoFactorOtpVerificationView } from "@/components/auth/TwoFactorOtpVerificationView";
+import { getBiometricLabel, getBiometricType, authenticateBiometricDetailed } from "@/lib/biometrics-util";
 
 interface BalanceCardProps {
   balance: number;
@@ -84,7 +87,8 @@ const BankLogo: React.FC<BankLogoProps> = ({ name, code, logoUrl, logoBackupUrl 
 
 export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName, isLoading }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const { userData, user } = useAuth();
+  const { userData, user, updateUserData } = useAuth();
+  const [isTierUpgradeOpen, setIsTierUpgradeOpen] = useState(false);
 
   useEffect(() => {
     const saved = sessionStorage.getItem("balance_visible");
@@ -1745,7 +1749,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   // Execute Direct Outward Transfer (Single or Bulk)
-  const executeOutwardTransfer = async (completedPin: string) => {
+  const executeOutwardTransfer = async (completedPin?: string, isBiometricAuthenticated?: boolean) => {
     if (!isFeatureEnabled(config?.featureToggles, "transfer")) {
       toast.error(getFeatureDisabledMessage(config?.featureToggles, "transfer"));
       return;
@@ -1770,6 +1774,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             title: "Staff December Settlement",
             recipients: bulkRecipients,
             pin: completedPin,
+            isBiometricAuthenticated,
           }),
         });
 
@@ -1777,6 +1782,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         toast.dismiss();
 
         if (res.ok && data.success) {
+          setIsTransferring(false);
           setTransferResult({
             success: true,
             message: `Your bulk transfer of ${bulkRecipients.length} recipients has been successfully queued in the background!`,
@@ -1785,7 +1791,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           handleSaveBulkRecents();
           setTrfStep("completion");
           toast.success("Bulk batch queued successfully!");
-          fetchWalletBalances(); // Re-fetch immediately to update balance state in UI
+          if (typeof data.walletBalance === "number") {
+            setWalletBalances((prev) => ({ ...prev, NGN: data.walletBalance }));
+          }
+          fetchWalletBalances();
+          window.dispatchEvent(new Event("app-refresh"));
         } else {
           setTrfPin("");
           const backendErr = data.error || data.message || data.data?.message || "Bulk transfer queuing failed.";
@@ -1829,6 +1839,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         beneficiary_name: trfAccountName,
         beneficiaryName: trfAccountName,
         pin: completedPin,
+        isBiometricAuthenticated,
       };
       console.log("Outward Transfer Payload to VM Payment Gateway:", payload);
 
@@ -1845,6 +1856,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       toast.dismiss();
 
       if (res.ok && data.success) {
+        setIsTransferring(false);
         setTransferResult({
           success: true,
           message: `Your outward bank transfer has been initiated successfully! ₦${parseFloat(trfAmount).toLocaleString()} is being settled to ${trfAccountName}.`,
@@ -1859,7 +1871,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         if (typeof data.walletBalance === "number") {
           setWalletBalances((prev) => ({ ...prev, NGN: data.walletBalance }));
         }
-        await fetchWalletBalances();
+        fetchWalletBalances();
+        window.dispatchEvent(new Event("app-refresh"));
 
         toast.success("Transfer initiated successfully!");
       } else {
@@ -1878,10 +1891,52 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }
   };
 
+  const [isTrf2faStage, setIsTrf2faStage] = useState(false);
+  const [trfVerifiedPin, setTrfVerifiedPin] = useState("");
+
+  const [isSwap2faStage, setIsSwap2faStage] = useState(false);
+  const [swapVerifiedPin, setSwapVerifiedPin] = useState("");
+
+  const handleBiometricTransferAuth = async () => {
+    if (!navigator.onLine) {
+      toast.error("Internet connection required to verify biometrics.");
+      return;
+    }
+    const label = getBiometricLabel();
+    toast.loading(`Authenticating ${label}...`);
+    const res = await authenticateBiometricDetailed(`Authorize ₦${trfTotalDebit.toLocaleString()} transfer`);
+    toast.dismiss();
+
+    if (res.success) {
+      toast.success(`${label} Authenticated!`);
+      if (userData?.isBiometricTransferEnabled !== true) {
+        updateUserData({ isBiometricTransferEnabled: true, isBiometricLoginEnabled: true, isFaceIdEnabled: true }).catch(() => {});
+      }
+      if (userData?.is2faOtpEnabled === true) {
+        setTrfVerifiedPin("");
+        setIsTrf2faStage(true);
+      } else {
+        executeOutwardTransfer(undefined, true);
+      }
+    } else if (res.cancelled) {
+      // User cancelled biometric prompt cleanly
+    } else {
+      toast.error(res.message || `${label} authentication failed.`);
+    }
+  };
+
   const handleTrfPinPress = (num: string) => {
     if (trfPin.length < 4) {
       const nextPin = trfPin + num;
       setTrfPin(nextPin);
+      if (nextPin.length === 4) {
+        if (userData?.is2faOtpEnabled === true) {
+          setTrfVerifiedPin(nextPin);
+          setIsTrf2faStage(true);
+        } else {
+          executeOutwardTransfer(nextPin);
+        }
+      }
     }
   };
 
@@ -1889,129 +1944,190 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     setTrfPin(trfPin.slice(0, -1));
   };
 
-  const downloadReceiptImage = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 600;
-    canvas.height = 800;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      toast.error("Unable to generate receipt image");
-      return;
-    }
+  const generateReceiptBlob = (): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 600;
+      canvas.height = 800;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
 
-    // 1. Background
-    ctx.fillStyle = "#F8FAFC"; // Slate-50 background
-    ctx.fillRect(0, 0, 600, 800);
+      // 1. Background
+      ctx.fillStyle = "#F8FAFC"; // Slate-50 background
+      ctx.fillRect(0, 0, 600, 800);
 
-    // Inner card background
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(30, 30, 540, 740);
+      // Inner card background
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(30, 30, 540, 740);
 
-    // Draw borders/shadow representation
-    ctx.strokeStyle = "#E2E8F0";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(30, 30, 540, 740);
+      // Draw borders/shadow representation
+      ctx.strokeStyle = "#E2E8F0";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(30, 30, 540, 740);
 
-    // 2. Header Logo Banner (E-Tech Theme)
-    ctx.fillStyle = "#FC7A00"; // Signature brand orange
-    ctx.fillRect(30, 30, 540, 90);
+      // 2. Header Logo Banner (E-Tech Theme)
+      ctx.fillStyle = "#FC7A00"; // Signature brand orange
+      ctx.fillRect(30, 30, 540, 90);
 
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "900 24px 'Arial', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("E-TECH GLOBAL HUB", 300, 80);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "900 24px 'Arial', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("E-TECH GLOBAL HUB", 300, 80);
 
-    // Header label
-    ctx.fillStyle = "#1E293B"; // Slate-800
-    ctx.font = "800 16px 'Arial', sans-serif";
-    ctx.fillText("OFFICIAL TRANSACTION RECEIPT", 300, 165);
+      // Header label
+      ctx.fillStyle = "#1E293B"; // Slate-800
+      ctx.font = "800 16px 'Arial', sans-serif";
+      ctx.fillText("OFFICIAL TRANSACTION RECEIPT", 300, 165);
 
-    // Draw Success Icon Check
-    ctx.fillStyle = "#10B981"; // emerald-500
-    ctx.beginPath();
-    ctx.arc(300, 220, 30, 0, 2 * Math.PI);
-    ctx.fill();
-
-    // Checkmark sign
-    ctx.strokeStyle = "#FFFFFF";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(288, 220);
-    ctx.lineTo(297, 229);
-    ctx.lineTo(314, 212);
-    ctx.stroke();
-
-    // SUCCESSFUL text
-    ctx.fillStyle = "#10B981";
-    ctx.font = "bold 14px 'Arial', sans-serif";
-    ctx.fillText("TRANSFER SUCCESSFUL", 300, 275);
-
-    // 3. Draw transaction parameter rows
-    const rows = [
-      { label: "RECIPIENT", value: isBulkMode ? "BATCH RECIPIENTS" : (trfAccountName || "BENEFICIARY").toUpperCase() },
-      { label: "BANK", value: isBulkMode ? "MULTIPLE BANKS" : (trfBank?.name || "N/A").toUpperCase() },
-      { label: "ACCOUNT NUMBER", value: isBulkMode ? "MULTIPLE" : trfAccount },
-      { label: "AMOUNT DEBITED", value: `₦${parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}` },
-      { label: "TRANSACTION FEE", value: `₦${trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` },
-      { label: "REFERENCE CODE", value: transferResult?.reference || "N/A" },
-      { label: "SETTLEMENT DATE", value: new Date().toLocaleString() },
-      { label: "STATUS", value: "SUCCESSFUL" }
-    ];
-
-    let startY = 320;
-    const rowHeight = 42;
-
-    ctx.textAlign = "left";
-    rows.forEach((row) => {
-      // Draw row lines
-      ctx.strokeStyle = "#F1F5F9";
-      ctx.lineWidth = 1;
+      // Draw Success Icon Check
+      ctx.fillStyle = "#10B981"; // emerald-500
       ctx.beginPath();
-      ctx.moveTo(60, startY + 8);
-      ctx.lineTo(540, startY + 8);
+      ctx.arc(300, 220, 30, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Checkmark sign
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(288, 220);
+      ctx.lineTo(297, 229);
+      ctx.lineTo(314, 212);
       ctx.stroke();
 
-      // Label
-      ctx.fillStyle = "#64748B"; // Slate-500
-      ctx.font = "700 11px 'Arial', sans-serif";
-      ctx.fillText(row.label, 60, startY);
+      // SUCCESSFUL text
+      ctx.fillStyle = "#10B981";
+      ctx.font = "bold 14px 'Arial', sans-serif";
+      ctx.fillText("TRANSFER SUCCESSFUL", 300, 275);
 
-      // Value
-      ctx.textAlign = "right";
-      if (row.label === "AMOUNT DEBITED") {
-        ctx.fillStyle = "#10B981"; // Green amount
-        ctx.font = "900 13px 'Arial', sans-serif";
-      } else if (row.label === "STATUS") {
-        ctx.fillStyle = "#10B981"; // Success pill representation
-        ctx.font = "bold 12px 'Arial', sans-serif";
-      } else {
-        ctx.fillStyle = "#0F172A"; // Dark value
-        ctx.font = "bold 12px 'Arial', sans-serif";
-      }
-      ctx.fillText(row.value, 540, startY);
-      ctx.textAlign = "left"; // Reset align
+      // 3. Draw transaction parameter rows
+      const rows = [
+        { label: "RECIPIENT", value: isBulkMode ? "BATCH RECIPIENTS" : (trfAccountName || "BENEFICIARY").toUpperCase() },
+        { label: "BANK", value: isBulkMode ? "MULTIPLE BANKS" : (trfBank?.name || "N/A").toUpperCase() },
+        { label: "ACCOUNT NUMBER", value: isBulkMode ? "MULTIPLE" : trfAccount },
+        { label: "AMOUNT DEBITED", value: `₦${parseFloat(trfAmount || "0").toLocaleString("en-NG", { minimumFractionDigits: 2 })}` },
+        { label: "TRANSACTION FEE", value: `₦${trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` },
+        { label: "REFERENCE CODE", value: transferResult?.reference || "N/A" },
+        { label: "SETTLEMENT DATE", value: new Date().toLocaleString() },
+        { label: "STATUS", value: "SUCCESSFUL" }
+      ];
 
-      startY += rowHeight;
+      let startY = 320;
+      const rowHeight = 42;
+
+      ctx.textAlign = "left";
+      rows.forEach((row) => {
+        // Draw row lines
+        ctx.strokeStyle = "#F1F5F9";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(60, startY + 8);
+        ctx.lineTo(540, startY + 8);
+        ctx.stroke();
+
+        // Label
+        ctx.fillStyle = "#64748B"; // Slate-500
+        ctx.font = "700 11px 'Arial', sans-serif";
+        ctx.fillText(row.label, 60, startY);
+
+        // Value
+        ctx.textAlign = "right";
+        if (row.label === "AMOUNT DEBITED") {
+          ctx.fillStyle = "#10B981"; // Green amount
+          ctx.font = "900 13px 'Arial', sans-serif";
+        } else if (row.label === "STATUS") {
+          ctx.fillStyle = "#10B981"; // Success pill representation
+          ctx.font = "bold 12px 'Arial', sans-serif";
+        } else {
+          ctx.fillStyle = "#0F172A"; // Dark value
+          ctx.font = "bold 12px 'Arial', sans-serif";
+        }
+        ctx.fillText(row.value, 540, startY);
+        ctx.textAlign = "left"; // Reset align
+
+        startY += rowHeight;
+      });
+
+      // 4. Draw Footer
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#94A3B8"; // Slate-400
+      ctx.font = "italic 11px 'Arial', sans-serif";
+      ctx.fillText("Thank you for choosing E-Tech Global Hub.", 300, 690);
+      ctx.fillText("This is an official transaction document and serves as proof of payment.", 300, 710);
+      ctx.fillText("Support: support@etechglobalhub.com", 300, 730);
+
+      canvas.toBlob((blob) => {
+        resolve(blob);
+      }, "image/png");
     });
+  };
 
-    // 4. Draw Footer
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#94A3B8"; // Slate-400
-    ctx.font = "italic 11px 'Arial', sans-serif";
-    ctx.fillText("Thank you for choosing E-Tech Global Hub.", 300, 690);
-    ctx.fillText("This is an official transaction document and serves as proof of payment.", 300, 710);
-    ctx.fillText("Support: support@etechglobalhub.com", 300, 730);
-
-    // Save/Download image trigger
+  const downloadReceiptImage = async () => {
     try {
+      const blob = await generateReceiptBlob();
+      if (!blob) {
+        toast.error("Unable to generate receipt image.");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.download = `Receipt_${transferResult?.reference || "transfer"}.png`;
-      link.href = canvas.toDataURL("image/png");
+      link.href = url;
       link.click();
+      URL.revokeObjectURL(url);
       toast.success("Receipt image downloaded successfully!");
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to export receipt image");
+      console.error("Receipt download error:", err);
+      toast.error("Failed to export receipt image.");
+    }
+  };
+
+  const shareReceiptImage = async () => {
+    try {
+      const blob = await generateReceiptBlob();
+      const ref = transferResult?.reference || "transfer";
+      const receiptTitle = "Transaction Receipt";
+      const recipientText = isBulkMode ? "Batch Recipients" : trfAccountName;
+      const amountText = `₦${parseFloat(trfAmount || "0").toLocaleString()}`;
+      const summaryText = `Transaction Receipt from E-Tech Global Hub\nRecipient: ${recipientText}\nAmount: ${amountText}\nRef: ${ref}\nDate: ${new Date().toLocaleString()}`;
+
+      if (blob && navigator.share && navigator.canShare) {
+        const file = new File([blob], `Receipt_${ref}.png`, { type: "image/png" });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            title: receiptTitle,
+            text: summaryText,
+            files: [file],
+          });
+          toast.success("Receipt shared successfully!");
+          return;
+        }
+      }
+
+      // Fallback 1: Text Web Share API
+      if (navigator.share) {
+        await navigator.share({
+          title: receiptTitle,
+          text: summaryText,
+        });
+        toast.success("Receipt shared successfully!");
+        return;
+      }
+
+      // Fallback 2: WhatsApp Web/App Direct Deep Link
+      const waUrl = `https://wa.me/?text=${encodeURIComponent(summaryText)}`;
+      window.open(waUrl, "_blank", "noopener,noreferrer");
+      toast.success("Opening WhatsApp to share receipt...");
+    } catch (err: any) {
+      if (err?.name === "AbortError") {
+        return; // User cancelled share dialog
+      }
+      console.warn("Share error, falling back to clipboard:", err);
+      const summaryText = `Transaction Receipt from E-Tech Global Hub\nRecipient: ${isBulkMode ? "Batch Recipients" : trfAccountName}\nAmount: ₦${parseFloat(trfAmount || "0").toLocaleString()}\nRef: ${transferResult?.reference || ""}\nDate: ${new Date().toLocaleString()}`;
+      navigator.clipboard.writeText(summaryText);
+      toast.success("Receipt details copied to clipboard!");
     }
   };
 
@@ -2450,6 +2566,37 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           </div>
         </div>
       </div>
+
+      {/* Deposit Limit Exceeded Warning Banner */}
+      {(Boolean(userData?.depositLimitExceeded) || (userData?.unlimitedDeposits !== true && (Number(userData?.dailyDepositLimit) || 1000000) > 0 && (Number(userData?.todayDepositTotal) || 0) > (Number(userData?.dailyDepositLimit) || 1000000))) && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3.5 p-3.5 bg-amber-500/10 border-[1.5px] border-amber-500/40 rounded-xl flex items-center justify-between gap-3 text-left relative overflow-hidden select-none shadow-sm"
+        >
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-600 flex-shrink-0">
+              <span className="material-symbols-outlined text-[20px] font-black animate-pulse">error</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="font-hanken font-extrabold text-xs text-amber-800 uppercase tracking-wide flex items-center gap-1">
+                Deposit Limit Exceeded
+              </h4>
+              <p className="font-hanken text-[10.5px] text-amber-700 font-bold mt-0.5 leading-snug">
+                Your account is pending because your deposit limit was exceeded. You cannot spend funds until upgraded.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => { triggerHaptic(); setIsTierUpgradeOpen(true); }}
+            className="px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-xs active:scale-95 shrink-0"
+          >
+            Upgrade Limit
+          </button>
+        </motion.div>
+      )}
 
       {/* Frozen Account Alert Notice Banner */}
       {(userData?.isFrozen || userData?.status === "FROZEN") && (
@@ -3623,6 +3770,19 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             const amt = parseFloat(trfAmount) || 0;
                             const isBelowMin = amt < activeMinTransfer;
 
+                            const currentTierName = String(userData?.tier || (userData?.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
+                            const hasCustomLimits = userData?.hasCustomLimits === true;
+
+                            const userSingleCap = (hasCustomLimits && Number(userData?.maxSingleTransferLimit) > 0)
+                              ? Number(userData.maxSingleTransferLimit)
+                              : (currentTierName === "Tier 3"
+                                  ? (config?.tier3SingleTransferLimit ?? config?.tier3SingleLimit ?? 10000000)
+                                  : currentTierName === "Tier 2"
+                                  ? (config?.tier2SingleTransferLimit ?? config?.tier2SingleLimit ?? 2000000)
+                                  : (config?.tier1SingleTransferLimit ?? 200000));
+
+                            const isExceedingSingleLimit = !userData?.unlimitedTransfers && userSingleCap > 0 && amt > userSingleCap;
+
                             return (
                               <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2 font-hanken text-xs">
                                 <div className="flex justify-between text-gray-500">
@@ -3645,11 +3805,45 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                     <span className="font-mono text-emerald-600 font-black">₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
                                   )}
                                 </div>
+
                                 {isBelowMin && (
                                   <p className="text-[9px] text-[#E11D48] font-bold uppercase leading-none pt-1">
                                     ⚠️ Minimum required transfer limit is ₦{activeMinTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                   </p>
                                 )}
+
+                                {isExceedingSingleLimit && (
+                                  <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-left">
+                                    <p className="text-[10px] font-extrabold text-amber-900 leading-snug">
+                                      ⚠️ Transfer amount of ₦{amt.toLocaleString()} exceeds your {currentTierName} single transaction limit of ₦{userSingleCap.toLocaleString()}.
+                                    </p>
+                                    <div className="flex gap-2 pt-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          triggerHaptic();
+                                          setIsTransferOpen(false);
+                                          setIsTierUpgradeOpen(true);
+                                        }}
+                                        className="px-2.5 py-1 bg-[#FC7A00] text-white text-[9.5px] font-black uppercase tracking-wider rounded-lg shadow-2xs hover:brightness-105 active:scale-95 cursor-pointer"
+                                      >
+                                        Upgrade Tier
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          triggerHaptic();
+                                          setIsTransferOpen(false);
+                                          router.push("/support");
+                                        }}
+                                        className="px-2.5 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 text-[9.5px] font-black uppercase tracking-wider rounded-lg active:scale-95 cursor-pointer"
+                                      >
+                                        Contact Support
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
                                 {(() => {
                                   const debt = Number(userData?.outstandingDebt) || 0;
                                   const spendable = Math.max(0, balance - debt);
@@ -4010,100 +4204,126 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   exit={{ opacity: 0 }}
                   className="space-y-4 flex-1 flex flex-col justify-between items-center text-center w-full max-w-md mx-auto"
                 >
-                  <div className="space-y-4 w-full">
-                    <div className="text-center space-y-1">
-                      <div className="w-12 h-12 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center text-[#FC7A00] mx-auto">
-                        <span className="material-symbols-outlined text-[24px] font-black">lock</span>
-                      </div>
-                      <h4 className="font-hanken font-extrabold text-base text-black mt-2">Enter Transaction PIN</h4>
-                      <p className="font-hanken text-[11px] text-gray-400">Authorize your transfer securely using your 4-digit PIN.</p>
-                    </div>
-
-                    {/* Displaying user Balance and amount user wants to Transfer inside UI card */}
-                    <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-2 font-hanken text-left">
-                      <div className="flex justify-between text-xs font-bold text-gray-700">
-                        <span>Amount to Transfer:</span>
-                        <span className="font-mono font-black text-[#E11D48]">
-                          ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-xs font-semibold text-gray-500 border-t border-gray-200/60 pt-2">
-                        <span>My Wallet Balance:</span>
-                        <span className="font-mono text-black font-extrabold">
-                          ₦{balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* 4 Box PIN Indicators */}
-                    <div className="space-y-2 text-center py-1">
-                      <div className="flex justify-center gap-2 pt-1">
-                        {[0, 1, 2, 3].map((idx) => (
-                          <div
-                            key={idx}
-                            className={`w-11 h-12 rounded-xl border-2 flex items-center justify-center text-lg font-black transition-all ${
-                              trfPin.length > idx
-                                ? "border-[#FC7A00] bg-orange-50/40 text-black"
-                                : "border-gray-200 bg-white"
-                            }`}
-                          >
-                            {trfPin[idx] ? "•" : ""}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Standardized Transaction Keypad Grid */}
-                  <div className="grid grid-cols-3 gap-2.5 pt-1 w-full max-w-xs mx-auto">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => {
-                          if (trfPin.length < 4) setTrfPin((prev) => prev + num);
-                        }}
-                        className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
-                      >
-                        {num}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setTrfPin("")}
-                      className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-pointer active:scale-95 transition-all"
-                    >
-                      CLEAR
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (trfPin.length < 4) setTrfPin((prev) => prev + "0");
+                  {isTrf2faStage ? (
+                    <TwoFactorOtpVerificationView
+                      user={user}
+                      title="2FA Transfer Verification"
+                      description={`PIN/Biometrics verified! Complete 2FA OTP verification to authorize ₦${trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })} transfer.`}
+                      onVerifiedSuccess={() => executeOutwardTransfer(trfVerifiedPin || undefined, !trfVerifiedPin)}
+                      onCancel={() => {
+                        setIsTrf2faStage(false);
+                        setTrfPin("");
                       }}
-                      className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
-                    >
-                      0
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleTrfPinDelete()}
-                      className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 cursor-pointer active:scale-95 transition-all flex items-center justify-center"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">backspace</span>
-                    </button>
-                  </div>
+                    />
+                  ) : (
+                    <>
+                      <div className="space-y-4 w-full">
+                        <div className="text-center space-y-1">
+                          <div className="w-12 h-12 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center text-[#FC7A00] mx-auto">
+                            <span className="material-symbols-outlined text-[24px] font-black">lock</span>
+                          </div>
+                          <h4 className="font-hanken font-extrabold text-base text-black mt-2">Enter Transaction PIN</h4>
+                          <p className="font-hanken text-[11px] text-gray-400">Authorize your transfer securely using your 4-digit PIN.</p>
+                        </div>
 
-                  {/* Authorize Transfer button */}
-                  <div className="w-full max-w-xs mx-auto pt-1 pb-2">
-                    <button
-                      type="button"
-                      disabled={trfPin.length < 4}
-                      onClick={() => executeOutwardTransfer(trfPin)}
-                      className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98"
-                    >
-                      Authorize Transfer
-                    </button>
-                  </div>
+                        {/* Displaying user Balance and amount user wants to Transfer inside UI card */}
+                        <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-2 font-hanken text-left">
+                          <div className="flex justify-between text-xs font-bold text-gray-700">
+                            <span>Amount to Transfer:</span>
+                            <span className="font-mono font-black text-[#E11D48]">
+                              ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs font-semibold text-gray-500 border-t border-gray-200/60 pt-2">
+                            <span>My Wallet Balance:</span>
+                            <span className="font-mono text-black font-extrabold">
+                              ₦{balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 4 Box PIN Indicators */}
+                        <div className="space-y-2 text-center py-1">
+                          <div className="flex justify-center gap-2 pt-1">
+                            {[0, 1, 2, 3].map((idx) => (
+                              <div
+                                key={idx}
+                                className={`w-11 h-12 rounded-xl border-2 flex items-center justify-center text-lg font-black transition-all ${
+                                  trfPin.length > idx
+                                    ? "border-[#FC7A00] bg-orange-50/40 text-black"
+                                    : "border-gray-200 bg-white"
+                                }`}
+                              >
+                                {trfPin[idx] ? "•" : ""}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Standardized Transaction Keypad Grid */}
+                      <div className="grid grid-cols-3 gap-2.5 pt-1 w-full max-w-xs mx-auto">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => {
+                              if (trfPin.length < 4) setTrfPin((prev) => prev + num);
+                            }}
+                            className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                          >
+                            {num}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setTrfPin("")}
+                          className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-pointer active:scale-95 transition-all"
+                        >
+                          CLEAR
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (trfPin.length < 4) setTrfPin((prev) => prev + "0");
+                          }}
+                          className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                        >
+                          0
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleTrfPinDelete()}
+                          className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 cursor-pointer active:scale-95 transition-all flex items-center justify-center"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">backspace</span>
+                        </button>
+                      </div>
+
+                      {/* Biometric Transfer or PIN Authorize Transfer button */}
+                      <div className="w-full max-w-xs mx-auto pt-1 pb-2 space-y-1.5">
+                        <button
+                          type="button"
+                          onClick={handleBiometricTransferAuth}
+                          className="w-full py-2.5 bg-[#07B038] hover:bg-[#058a2f] text-white text-[11px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all active:scale-98 flex items-center justify-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            {getBiometricType() === "faceid" ? "face_6" : "fingerprint"}
+                          </span>
+                          <span>Authorize via {getBiometricLabel()}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={trfPin.length < 4}
+                          onClick={() => executeOutwardTransfer(trfPin)}
+                          className="w-full py-2.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-[11px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all active:scale-98"
+                        >
+                          Authorize via PIN
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </motion.div>
               )}
 
@@ -4194,60 +4414,44 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   </div>
 
                   {/* Actions Bar */}
-                  <div className="w-full space-y-2 flex-shrink-0 mt-2">
-                    <div className="grid grid-cols-2 gap-2">
+                  <div className="w-full space-y-2.5 flex-shrink-0 mt-3 select-none">
+                    <div className="grid grid-cols-2 gap-2.5">
                       {/* Download Image Action */}
                       <button
                         type="button"
                         onClick={downloadReceiptImage}
-                        className="py-2.5 bg-white border border-gray-200 hover:border-black text-black text-[10px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1 shadow-sm"
+                        className="py-3 bg-gray-50 hover:bg-orange-50/50 border border-gray-200 hover:border-[#FC7A00]/40 text-black text-[10.5px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-2xs"
                       >
-                        <span className="material-symbols-outlined text-[15px] text-orange-500">image</span>
-                        Download Image
+                        <span className="material-symbols-outlined text-[17px] text-[#FC7A00]">image</span>
+                        <span>Download Image</span>
                       </button>
 
                       {/* Download PDF Action */}
                       <button
                         type="button"
                         onClick={downloadReceiptPDF}
-                        className="py-2.5 bg-white border border-gray-200 hover:border-black text-black text-[10px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1 shadow-sm"
+                        className="py-3 bg-gray-50 hover:bg-rose-50/50 border border-gray-200 hover:border-rose-300 text-black text-[10.5px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-2xs"
                       >
-                        <span className="material-symbols-outlined text-[15px] text-red-500">picture_as_pdf</span>
-                        Download PDF
+                        <span className="material-symbols-outlined text-[17px] text-rose-500">picture_as_pdf</span>
+                        <span>Download PDF</span>
                       </button>
                     </div>
 
-                    {/* Share Receipt functional trigger (TASK 7) */}
+                    {/* Share Receipt functional trigger with WhatsApp & Native Share API */}
                     <button
                       type="button"
-                      onClick={async () => {
-                        const receiptText = `Transaction Receipt\nRecipient: ${isBulkMode ? "Batch Recipients" : trfAccountName}\nBank: ${isBulkMode ? "Multiple" : trfBank?.name}\nAmount: ₦${parseFloat(trfAmount).toLocaleString()}\nRef: ${transferResult.reference || ""}\nDate: ${new Date().toLocaleString()}\nPowered by E-Tech Global Hub`;
-                        if (navigator.share) {
-                          try {
-                            await navigator.share({
-                              title: "Transaction Receipt",
-                              text: receiptText,
-                            });
-                          } catch {
-                            navigator.clipboard.writeText(receiptText);
-                            toast.success("Receipt copied to clipboard!");
-                          }
-                        } else {
-                          navigator.clipboard.writeText(receiptText);
-                          toast.success("Receipt copied to clipboard!");
-                        }
-                      }}
-                      className="w-full py-2.5 bg-white border border-gray-200 hover:border-black text-black text-[10px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1 shadow-sm"
+                      onClick={shareReceiptImage}
+                      className="w-full py-3 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-[10.5px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-2 shadow-2xs"
                     >
-                      <span className="material-symbols-outlined text-[15px] text-blue-500">share</span>
-                      Share Receipt
+                      <span className="material-symbols-outlined text-[18px] text-emerald-600">share</span>
+                      <span>Share Receipt to WhatsApp / Apps</span>
                     </button>
 
-                    {/* Done Action Button (TASK 7) */}
+                    {/* Done Action Button */}
                     <button
                       type="button"
                       onClick={handleCloseTransferModal}
-                      className="w-full py-3 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all shadow-md"
+                      className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all shadow-sm border-0"
                     >
                       Done
                     </button>
@@ -4631,6 +4835,19 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             ) : (
               /* PIN Authorization Step */
               <div className="space-y-5 flex flex-col items-center text-center w-full max-w-md mx-auto">
+                {isSwap2faStage ? (
+                  <TwoFactorOtpVerificationView
+                    user={user}
+                    title="2FA Currency Swap Verification"
+                    description={`PIN/Biometrics verified! Complete 2FA OTP verification to authorize currency swap from ${swapFromCurrency} to ${swapToCurrency}.`}
+                    onVerifiedSuccess={() => handleSwapExecute()}
+                    onCancel={() => {
+                      setIsSwap2faStage(false);
+                      setSwapPin("");
+                    }}
+                  />
+                ) : (
+                  <>
                 <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-3 font-hanken shadow-xs w-full text-left">
                   <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Swap Summary Breakdown</p>
 
@@ -4735,7 +4952,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                 <button
                   type="button"
-                  onClick={() => handleSwapExecute()}
+                  onClick={() => {
+                    if (swapPin.length < 4) return;
+                    if (userData?.is2faOtpEnabled === true) {
+                      setSwapVerifiedPin(swapPin);
+                      setIsSwap2faStage(true);
+                    } else {
+                      handleSwapExecute();
+                    }
+                  }}
                   disabled={isSwapping || swapPin.length < 4}
                   className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2 mt-2 shadow-sm"
                 >
@@ -4751,6 +4976,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     </>
                   )}
                 </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -4786,6 +5013,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       isOpen={isKycDrawerOpen}
       onClose={() => setIsKycDrawerOpen(false)}
       onSuccess={() => setIsKycDrawerOpen(false)}
+    />
+
+    {/* Tier Upgrade Drawer Modal */}
+    <TierUpgradeDrawerModal
+      isOpen={isTierUpgradeOpen}
+      onClose={() => setIsTierUpgradeOpen(false)}
+      onRequestSubmitted={() => setIsTierUpgradeOpen(false)}
     />
     </>
   );

@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     }
 
     const gatewayUrl = (process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org").replace(/\/$/, "");
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
     const txRef = url.searchParams.get("tx_ref") || orderData?.txRef || `TX-STORE-${orderId}`;
 
     let isVerified = false;
@@ -36,13 +36,17 @@ export async function GET(req: Request) {
     // 1. Primary Verification: Query backend VM S2S verify route using secure VM .env configuration
     if (transactionId || txRef) {
       try {
+        const verifyHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (gatewayApiKey) {
+          verifyHeaders["X-API-Key"] = gatewayApiKey;
+          verifyHeaders["Authorization"] = `Bearer ${gatewayApiKey}`;
+        }
+
         const vmVerifyRes = await fetch(`${gatewayUrl}/api/flutterwave/verify`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": gatewayApiKey,
-            "Authorization": `Bearer ${gatewayApiKey}`,
-          },
+          headers: verifyHeaders,
           body: JSON.stringify({
             transaction_id: transactionId,
             tx_ref: txRef,
@@ -65,13 +69,17 @@ export async function GET(req: Request) {
     // 2. Secondary Verification: Query backend VM proxy S2S route (/api/flutterwave/proxy)
     if (!isVerified && transactionId) {
       try {
+        const proxyHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (gatewayApiKey) {
+          proxyHeaders["X-API-Key"] = gatewayApiKey;
+          proxyHeaders["Authorization"] = `Bearer ${gatewayApiKey}`;
+        }
+
         const vmProxyRes = await fetch(`${gatewayUrl}/api/flutterwave/proxy`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": gatewayApiKey,
-            "Authorization": `Bearer ${gatewayApiKey}`,
-          },
+          headers: proxyHeaders,
           body: JSON.stringify({
             method: "GET",
             endpoint: `/transactions/${transactionId}/verify`,

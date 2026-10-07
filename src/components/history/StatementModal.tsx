@@ -149,7 +149,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
     setIsPinModalOpen(true);
   };
 
-  const handlePinSubmit = async (pin: string) => {
+  const handlePinSubmit = async (pin?: string, isBiometricAuthenticated?: boolean) => {
     const { valid, startIso, endIso } = validateDates();
     if (!valid || !user) {
       setIsPinModalOpen(false);
@@ -166,14 +166,14 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
         idToken = await user.getIdToken();
       }
 
-      // Step 1: Verify PIN via API
+      // Step 1: Verify PIN / Biometric via API
       const pinRes = await fetch("/api/auth/pin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
-        body: JSON.stringify({ action: "verify", pin }),
+        body: JSON.stringify({ action: "verify", pin, isBiometricAuthenticated }),
       });
 
       const pinData = await pinRes.json();
@@ -447,14 +447,14 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
         toast.success("Bank Statement PDF generated and downloaded successfully!");
         onClose();
       } else {
-        // Call S2S API route to dispatch statement to user email passing verified PIN
+        // Call S2S API route to dispatch statement to user email passing verified PIN / Biometric
         const res = await fetch("/api/history/statement/email", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
           },
-          body: JSON.stringify({ fromDate, toDate, pin }),
+          body: JSON.stringify({ fromDate, toDate, pin, isBiometricAuthenticated }),
         });
 
         const data = await res.json();

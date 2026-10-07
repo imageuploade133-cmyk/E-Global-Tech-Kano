@@ -80,13 +80,15 @@ export default function LoginPage() {
           <p className="text-gray-500 font-hanken mt-1 text-xs font-semibold">Welcome back to your secure hub</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-6" autoComplete="on">
           <div className="space-y-1.5 text-left">
             <label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address</label>
             <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
               <input
                 id="email"
+                name="username"
                 type="email"
+                autoComplete="username"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -114,7 +116,9 @@ export default function LoginPage() {
             <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs relative">
               <input
                 id="password"
+                name="password"
                 type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

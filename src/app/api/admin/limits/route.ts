@@ -13,13 +13,30 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const searchQuery = (searchParams.get("search") || searchParams.get("q") || "").trim().toLowerCase();
 
-    // Fetch active global minimum transfer limit
+    // Fetch active global minimum transfer limit & app config doc
     const globalMinTransferAmount = await getGlobalMinTransferAmount();
+    const appDoc = await adminDb.collection("config").doc("app").get();
+    const appData = appDoc.exists ? appDoc.data() : {};
+
+    const tier2DailyLimit = appData?.tier2DailyLimit ?? 5000000;
+    const tier2SingleLimit = appData?.tier2SingleLimit ?? 2000000;
+    const tier3DailyLimit = appData?.tier3DailyLimit ?? 50000000;
+    const tier3SingleLimit = appData?.tier3SingleLimit ?? 10000000;
+    const tierUpgradeSelectionTitle = appData?.tierUpgradeSelectionTitle || "SELECT TARGET UPGRADE TIER";
+    const acceptableGovernmentIds = Array.isArray(appData?.acceptableGovernmentIds) && appData.acceptableGovernmentIds.length > 0
+      ? appData.acceptableGovernmentIds
+      : ["National ID Card (NIN)", "International Passport", "Driver's License", "Voter's Card"];
 
     if (!searchQuery) {
       return NextResponse.json({
         success: true,
         globalMinTransferAmount,
+        tier2DailyLimit,
+        tier2SingleLimit,
+        tier3DailyLimit,
+        tier3SingleLimit,
+        tierUpgradeSelectionTitle,
+        acceptableGovernmentIds,
         users: []
       });
     }
@@ -77,7 +94,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    // Dedicated action for updating global minimum transfer amount
+    // Dedicated action for updating global minimum transfer amount & tier upgrade defaults
     if (body.action === "update_global_min_transfer" || (body.globalMinTransferAmount !== undefined && !body.targetUid && !body.uid)) {
       const newMin = Math.max(0, Number(body.globalMinTransferAmount ?? body.amount ?? DEFAULT_GLOBAL_MIN_TRANSFER));
       if (isNaN(newMin)) {
@@ -88,23 +105,29 @@ export async function POST(req: Request) {
       const limitsRef = adminDb.collection("config").doc("limits");
       const appRef = adminDb.collection("config").doc("app");
 
-      await limitsRef.set({
+      const updateConfig: Record<string, any> = {
         globalMinTransferAmount: newMin,
         minTransferAmount: newMin,
         updatedAt: nowIso,
-      }, { merge: true });
+      };
 
-      await appRef.set({
-        globalMinTransferAmount: newMin,
-        minTransferAmount: newMin,
-        updatedAt: nowIso,
-      }, { merge: true });
+      if (body.tier2DailyLimit !== undefined) updateConfig.tier2DailyLimit = Number(body.tier2DailyLimit);
+      if (body.tier2SingleLimit !== undefined) updateConfig.tier2SingleLimit = Number(body.tier2SingleLimit);
+      if (body.tier3DailyLimit !== undefined) updateConfig.tier3DailyLimit = Number(body.tier3DailyLimit);
+      if (body.tier3SingleLimit !== undefined) updateConfig.tier3SingleLimit = Number(body.tier3SingleLimit);
+      if (body.tierUpgradeSelectionTitle !== undefined) updateConfig.tierUpgradeSelectionTitle = String(body.tierUpgradeSelectionTitle).trim();
+      if (Array.isArray(body.acceptableGovernmentIds)) {
+        updateConfig.acceptableGovernmentIds = body.acceptableGovernmentIds.map((item: any) => String(item).trim()).filter(Boolean);
+      }
+
+      await limitsRef.set(updateConfig, { merge: true });
+      await appRef.set(updateConfig, { merge: true });
 
       return NextResponse.json({
         success: true,
-        message: `Global Minimum Transfer Limit updated to ₦${newMin.toLocaleString(undefined, { minimumFractionDigits: 2 })} successfully!`,
+        message: `Global limits & Tier Upgrade settings updated successfully!`,
         globalMinTransferAmount: newMin,
-        updatedAt: nowIso,
+        ...updateConfig,
       });
     }
 
@@ -132,6 +155,7 @@ export async function POST(req: Request) {
     }
 
     const updatePayload: Record<string, any> = {
+      hasCustomLimits: true,
       updatedAt: new Date().toISOString(),
     };
 

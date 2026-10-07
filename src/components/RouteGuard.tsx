@@ -34,7 +34,7 @@ const ButtonSpinner = () => (
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { user, loading, isPinVerified, userData, updateUserData, deviceAuthState } = useAuth();
-  const { config } = useAppConfig();
+  const { config, isConfigLoaded } = useAppConfig();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -64,9 +64,11 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     second: "2-digit"
   }));
 
-  // System-wide update states for real-time versions
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState(0);
+  // System-wide update states for real-time versions & Google Play Store update modal
+  const [showVersionModal, setShowVersionModal] = useState(false);
+  const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
+  const [playStoreProgress, setPlayStoreProgress] = useState(0);
+  const [playStoreStatusText, setPlayStoreStatusText] = useState("Downloading update...");
 
   const initializingDeviceRef = useRef(false);
 
@@ -151,48 +153,87 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Real-time server-side version mismatch update controller (Bypasses caching on Ctrl+F5)
+  // Real-time server-side version mismatch update controller
   useEffect(() => {
     const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
-    if (isMock) return;
+    if (isMock || !isConfigLoaded) return;
     if (typeof window === "undefined" || !config?.appVersion) return;
 
-    const serverVersion = config.appVersion;
-    const cachedVersion = sessionStorage.getItem("cached_app_version");
+    const serverVersion = (config.appVersion || "").trim();
+    if (!serverVersion) return;
 
-    if (cachedVersion === null) {
+    const localVersion = (localStorage.getItem("app_version") || "").trim();
+    const sessionVersion = (sessionStorage.getItem("cached_app_version") || "").trim();
+    const currentCachedVersion = localVersion || sessionVersion;
+
+    if (!currentCachedVersion) {
+      // First time loading: register current server version silently without modal trigger
+      localStorage.setItem("app_version", serverVersion);
       sessionStorage.setItem("cached_app_version", serverVersion);
-    } else if (cachedVersion !== serverVersion) {
-      setIsUpdating(true);
-      setUpdateProgress(0);
-
-      const interval = setInterval(() => {
-        setUpdateProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-
-            // Programmatically purge all Cache Storage and Service Worker cached files instantly
-            if ("caches" in window) {
-              caches.keys().then((keys) => {
-                Promise.all(keys.map((key) => caches.delete(key)));
-              });
-            }
-
-            // Clear sessionStorage completely
-            sessionStorage.clear();
-
-            // Set new app version cache and force reload
-            sessionStorage.setItem("cached_app_version", serverVersion);
-            window.location.reload();
-            return 100;
-          }
-          return prev + 5;
-        });
-      }, 150);
-
-      return () => clearInterval(interval);
+      setShowVersionModal(false);
+    } else if (currentCachedVersion !== serverVersion) {
+      setShowVersionModal(true);
+    } else {
+      setShowVersionModal(false);
     }
-  }, [config?.appVersion]);
+  }, [config?.appVersion, isConfigLoaded]);
+
+  const handlePerformAppUpdate = async () => {
+    if (!config?.appVersion) return;
+    setIsApplyingUpdate(true);
+    setPlayStoreProgress(0);
+    setPlayStoreStatusText("Downloading update...");
+
+    const serverVersion = config.appVersion.trim();
+
+    // Immediately record server version into storage & dismiss modal state to prevent repeat prompts
+    localStorage.setItem("app_version", serverVersion);
+    sessionStorage.setItem("cached_app_version", serverVersion);
+
+    // Simulated Google Play Store downloading & installing progress
+    const updateInterval = setInterval(() => {
+      setPlayStoreProgress((prev) => {
+        const next = prev + Math.floor(Math.random() * 8) + 5;
+        if (next >= 60 && next < 90) {
+          setPlayStoreStatusText("Installing update...");
+        } else if (next >= 90) {
+          setPlayStoreStatusText("Completing installation...");
+        }
+
+        if (next >= 100) {
+          clearInterval(updateInterval);
+          executeAppPurgeAndReload(serverVersion);
+          return 100;
+        }
+        return next;
+      });
+    }, 120);
+  };
+
+  const executeAppPurgeAndReload = async (latestVersion: string) => {
+    try {
+      if ("caches" in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+      }
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((reg) => reg.unregister()));
+      }
+
+      sessionStorage.clear();
+
+      // Write authoritative latest version into storage
+      localStorage.setItem("app_version", latestVersion);
+      sessionStorage.setItem("cached_app_version", latestVersion);
+
+      setTimeout(() => {
+        window.location.href = window.location.origin + pathname + "?v=" + Date.now();
+      }, 200);
+    } catch {
+      window.location.reload();
+    }
+  };
 
   // Detect and verify Flutterwave redirects globally on app startup
   useEffect(() => {
@@ -584,7 +625,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const isMockRoute = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
   if (loading && !isMockRoute) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-transparent p-6">
         <div className="relative flex flex-col items-center">
           <div className="flex flex-col items-center p-5 rounded-2xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50">
             <div className="relative w-10 h-10 flex items-center justify-center">
@@ -616,48 +657,134 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Render high-fidelity professional system update overlay (Ctrl+F5 instant reload powered)
-  if (isUpdating) {
+  // Render Full-Screen Drawer Modal when a new version update is detected
+  if (showVersionModal) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6 z-[9999999] relative">
+      <div className="fixed inset-0 z-[9999999] bg-[#ffffff] text-gray-900 flex flex-col justify-between p-6 md:p-10 overflow-hidden select-none font-hanken">
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <AppLogo size={32} />
+            <span className="font-black text-sm tracking-wider uppercase text-gray-900">E-GLOBAL PAY</span>
+          </div>
+          <span className="px-3 py-1 bg-orange-50 border border-orange-200 text-[#FC7A00] rounded-full text-[10px] font-black uppercase tracking-wider">
+            v{config?.appVersion || "1.0.1"}
+          </span>
+        </div>
+
+        {/* Center Content Drawer */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-sm bg-white rounded-[32px] p-6 text-center space-y-6 border border-gray-800/10"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="max-w-md mx-auto my-auto w-full text-center space-y-6"
         >
-          <div className="space-y-4">
-            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
-                className="absolute inset-0 rounded-full border-4 border-gray-100 border-t-[#FC7A00] border-r-emerald-500"
-              />
-              <span className="material-symbols-outlined text-[28px] text-[#FC7A00] animate-bounce">sync</span>
+          {/* Main Display: Google Play Store style loader vs App Update Emblem */}
+          {!isApplyingUpdate ? (
+            <div className="relative w-24 h-20 mx-auto flex items-center justify-center">
+              <div className="w-20 h-20 rounded-3xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00] shadow-xs">
+                <span className="material-symbols-outlined text-[42px]" style={{ fontVariationSettings: '"FILL" 1' }}>system_update</span>
+              </div>
             </div>
-            <h2 className="font-hanken font-black text-lg text-black uppercase tracking-wider leading-none">
-              SYSTEM UPGRADE IN PROGRESS
-            </h2>
-            <p className="font-hanken text-[11px] text-[#FC7A00] font-extrabold uppercase tracking-widest mt-1">
-              Optimizing application files
-            </p>
-            <p className="font-hanken text-xs text-gray-500 leading-relaxed font-semibold">
-              We are applying a direct system-wide update to your application. Caches are being synchronized for instant launch.
+          ) : (
+            <div className="relative w-28 h-28 mx-auto flex flex-col items-center justify-center">
+              {/* Google Play Store Ring Spinner */}
+              <div className="relative w-24 h-24 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  {/* Track Circle */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    stroke="#f3f4f6"
+                    strokeWidth="8"
+                    fill="transparent"
+                  />
+                  {/* Progress Circle (Google Play Store Green / Brand Accent) */}
+                  <motion.circle
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    stroke="#01875f"
+                    strokeWidth="8"
+                    strokeDasharray={264}
+                    strokeDashoffset={264 - (264 * playStoreProgress) / 100}
+                    strokeLinecap="round"
+                    fill="transparent"
+                    transition={{ ease: "easeInOut" }}
+                  />
+                </svg>
+
+                {/* Center Percentage Count */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-mono text-xl font-black text-[#01875f]">{playStoreProgress}%</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <h1 className="font-hanken font-black text-2xl text-gray-900 uppercase tracking-tight leading-tight">
+              {isApplyingUpdate ? playStoreStatusText : "New Update"}
+            </h1>
+            <p className="text-xs text-gray-500 font-semibold max-w-sm mx-auto leading-relaxed">
+              {isApplyingUpdate
+                ? "Please wait while the update is being downloaded and installed..."
+                : "A new update is ready for your app. Update now to enjoy new features, enhanced security, and performance improvements."}
             </p>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
-              <span>Memory Clearance</span>
-              <span className="font-mono text-black font-extrabold">{updateProgress}%</span>
+          {!isApplyingUpdate && (
+            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-left space-y-2.5 shadow-xs">
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">What&apos;s Included in this update</p>
+              <div className="space-y-2 text-xs font-bold text-gray-700">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-[#01875f]">check_circle</span>
+                  <span>Enhanced security and stability improvements</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-[#01875f]">check_circle</span>
+                  <span>Faster transaction processing speeds</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-[#01875f]">check_circle</span>
+                  <span>New features and user interface refinements</span>
+                </div>
+              </div>
             </div>
-            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+          )}
+
+          {isApplyingUpdate && (
+            <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
               <motion.div
-                className="h-full bg-gradient-to-r from-[#FC7A00] to-emerald-500 rounded-full"
-                style={{ width: `${updateProgress}%` }}
+                className="h-full bg-[#01875f] rounded-full"
+                style={{ width: `${playStoreProgress}%` }}
+                transition={{ duration: 0.2 }}
               />
             </div>
-          </div>
+          )}
         </motion.div>
+
+        {/* Bottom Action Footer */}
+        <div className="max-w-md mx-auto w-full pt-4">
+          <button
+            type="button"
+            disabled={isApplyingUpdate}
+            onClick={handlePerformAppUpdate}
+            className="w-full py-4 bg-[#01875f] hover:bg-[#016f4e] active:scale-98 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 disabled:opacity-75"
+          >
+            {isApplyingUpdate ? (
+              <>
+                <ButtonSpinner />
+                <span>{playStoreStatusText} ({playStoreProgress}%)</span>
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-[18px]">download</span>
+                <span>UPDATE NOW</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     );
   }
@@ -822,7 +949,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   // Wait for Firestore user data & session state check before making any PIN decision
   if (user && (deviceAuthState === "CHECKING_DEVICE_SESSION" || !userData) && !isMockRoute) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-transparent p-6">
         <div className="relative flex flex-col items-center">
           <div className="flex flex-col items-center p-5 rounded-2xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50">
             <div className="relative w-10 h-10 flex items-center justify-center">

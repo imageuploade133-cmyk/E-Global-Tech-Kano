@@ -26,9 +26,10 @@ export async function POST(
 
     const body = await req.json().catch(() => ({}));
     const { pin } = body;
+    const isBiometricReq = body.isBiometricAuthenticated === true || body.isBiometric === true;
 
     // PIN Verification
-    if (!pin || typeof pin !== "string" || pin.length !== 4 || isNaN(Number(pin))) {
+    if (!isBiometricReq && (!pin || typeof pin !== "string" || pin.length !== 4 || isNaN(Number(pin)))) {
       return NextResponse.json({ error: "4-digit transaction PIN is required to authorize payout request." }, { status: 400 });
     }
 
@@ -54,12 +55,18 @@ export async function POST(
     const pinHash = userData.pinHash;
     const currentPlainPin = userData.pin;
 
+    const isMock = userId === "mock-uid";
     let isPinMatch = false;
-    if (userId === "mock-uid") {
-      isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
-    } else if (pinHash) {
+    const isUserBiometricEnabled = userData.isBiometricTransferEnabled === true || userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
+    const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
+    if (isBiometricAuth && isUserBiometricEnabled) {
+      isPinMatch = true;
+    } else if (isMock) {
+      isPinMatch = (pin === "1234" || (Boolean(pin) && pin === currentPlainPin) || (pinHash && Boolean(pin) && bcrypt.compareSync(pin!, pinHash)));
+    } else if (pin && pinHash) {
       isPinMatch = bcrypt.compareSync(pin, pinHash);
-    } else if (currentPlainPin) {
+    } else if (pin && currentPlainPin) {
       isPinMatch = (pin === currentPlainPin);
     } else {
       return NextResponse.json({ error: "No transaction PIN has been set up on this account." }, { status: 400 });

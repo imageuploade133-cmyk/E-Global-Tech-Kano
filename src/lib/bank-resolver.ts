@@ -41,7 +41,6 @@ export function resolveBankName(
   const candidateNames = direction === "TRANSFER_FROM"
     ? [
         transaction.senderBankName,
-        transaction.bankName,
       ]
     : direction === "TRANSFER_TO"
     ? [
@@ -71,7 +70,6 @@ export function resolveBankName(
   const candidateCodes = direction === "TRANSFER_FROM"
     ? [
         transaction.senderBankCode,
-        transaction.bankCode,
       ]
     : direction === "TRANSFER_TO"
     ? [

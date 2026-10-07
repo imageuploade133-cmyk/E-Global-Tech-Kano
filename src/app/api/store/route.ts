@@ -46,10 +46,20 @@ export async function GET() {
       enableProductVideo: true,
     };
 
+    const storeSlides = Array.isArray(data.slides) ? [...data.slides] : [];
+    storeSlides.sort((a: any, b: any) => {
+      const posA = typeof a.position === "number" ? a.position : 9999;
+      const posB = typeof b.position === "number" ? b.position : 9999;
+      if (posA !== posB) return posA - posB;
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
     return NextResponse.json({
       success: true,
       items: visibleItems,
-      slides: Array.isArray(data.slides) ? data.slides : [],
+      slides: storeSlides,
       categories,
       settings: data.settings ? { ...defaultSettings, ...data.settings } : defaultSettings,
     });

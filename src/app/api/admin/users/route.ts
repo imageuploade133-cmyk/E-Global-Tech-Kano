@@ -203,7 +203,8 @@ export async function POST(req: Request) {
         phoneNumber,
         balance,
         role,
-        permissions
+        permissions,
+        pin
       } = body;
 
       // Enforce administrative creation privileges: Only SUPER_ADMIN or root can create administrative accounts
@@ -282,6 +283,11 @@ export async function POST(req: Request) {
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`.toUpperCase();
 
+      const cleanPin = String(pin || "").trim();
+      if (cleanPin && (cleanPin.length !== 4 || isNaN(Number(cleanPin)))) {
+        return NextResponse.json({ error: "Access PIN must be a valid 4-digit numeric code." }, { status: 400 });
+      }
+
       // Write user document to Firestore
       await adminDb.collection("users").doc(userRecord.uid).set({
         uid: userRecord.uid,
@@ -294,6 +300,7 @@ export async function POST(req: Request) {
         bonusBalance: 0,
         role: role || "user",
         permissions: cleanPermissions,
+        ...(cleanPin ? { pin: cleanPin, isPinRequired: true } : {}),
         createdAt: new Date().toISOString()
       });
 
@@ -382,6 +389,44 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         message: "User role & permissions updated and synchronized successfully!"
+      });
+
+    } else if (action === "set_pin" || action === "update_pin") {
+      const { targetUid, pin } = body;
+
+      if (!targetUid) {
+        return NextResponse.json({ error: "Missing user identifier." }, { status: 400 });
+      }
+
+      const cleanPin = String(pin || "").trim();
+      if (cleanPin.length !== 4 || isNaN(Number(cleanPin))) {
+        return NextResponse.json({ error: "Access PIN must be a valid 4-digit numeric code." }, { status: 400 });
+      }
+
+      if (uid === "mock-admin-uid") {
+        return NextResponse.json({
+          success: true,
+          message: `Access PIN updated to ${cleanPin} for mock user!`
+        });
+      }
+
+      const targetRef = adminDb.collection("users").doc(targetUid);
+      const targetDoc = await targetRef.get();
+      if (!targetDoc.exists) {
+        return NextResponse.json({ error: "Target user account document not found." }, { status: 404 });
+      }
+
+      await targetRef.update({
+        pin: cleanPin,
+        isPinRequired: true,
+        updatedAt: new Date().toISOString(),
+        pinUpdatedAt: new Date().toISOString(),
+        pinUpdatedBy: perm.auth?.email || uid,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `4-Digit Access PIN successfully set for ${targetDoc.data()?.name || targetUid}!`,
       });
 
     } else {

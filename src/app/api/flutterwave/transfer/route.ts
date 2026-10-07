@@ -78,6 +78,8 @@ export async function POST(req: Request) {
     const trfCurrency = currency ? String(currency).trim() : "NGN";
     const trfReference = reference ? String(reference).trim() : `trf-${Date.now()}-${uid.slice(-6)}`;
 
+    const isBiometricReq = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
     // Validations
     const globalMinTransfer = await getGlobalMinTransferAmount();
     if (!trfAmount || isNaN(trfAmount) || trfAmount < globalMinTransfer) {
@@ -85,7 +87,7 @@ export async function POST(req: Request) {
         error: `Invalid transfer amount. The global minimum required transfer limit is ₦${globalMinTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`,
       }, { status: 400 });
     }
-    if (!trfAccount || !trfBank || !pin) {
+    if (!trfAccount || !trfBank || (!isBiometricReq && !pin)) {
       return NextResponse.json({ error: "Account number, bank, and transaction PIN are required." }, { status: 400 });
     }
 
@@ -169,12 +171,25 @@ export async function POST(req: Request) {
         };
       }
 
+      const hasCustom = userData.hasCustomLimits === true;
+      const userTier = String(userData.tier || (userData.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
+
       if (!userData.unlimitedTransfers) {
-        const maxSingle = Number(userData.maxSingleTransferLimit) || 200000;
-        if (trfAmount > maxSingle) {
+        let singleTransferCap = 0;
+        if (hasCustom && typeof userData.maxSingleTransferLimit === "number" && Number(userData.maxSingleTransferLimit) > 0) {
+          singleTransferCap = Number(userData.maxSingleTransferLimit);
+        } else if (userTier === "Tier 3") {
+          singleTransferCap = typeof marginSnap.data()?.tier3SingleTransferLimit === "number" ? marginSnap.data()?.tier3SingleTransferLimit : 10000000;
+        } else if (userTier === "Tier 2") {
+          singleTransferCap = typeof marginSnap.data()?.tier2SingleTransferLimit === "number" ? marginSnap.data()?.tier2SingleTransferLimit : 2000000;
+        } else {
+          singleTransferCap = typeof marginSnap.data()?.tier1SingleTransferLimit === "number" ? marginSnap.data()?.tier1SingleTransferLimit : 200000;
+        }
+
+        if (singleTransferCap > 0 && trfAmount > singleTransferCap) {
           return {
             success: false,
-            error: `Transfer amount exceeds your single transaction limit of ₦${maxSingle.toLocaleString()}. Contact support to upgrade your limits.`,
+            error: `Transfer amount of ₦${trfAmount.toLocaleString()} exceeds your single transaction limit of ₦${singleTransferCap.toLocaleString()} for ${userTier}. Please upgrade your account tier or contact Support for assistance.`,
           };
         }
       }
@@ -197,11 +212,16 @@ export async function POST(req: Request) {
       }
 
       let isPinMatch = false;
-      if (isMock) {
-        isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
-      } else if (pinHash) {
+      const isUserBiometricEnabled = userData.isBiometricTransferEnabled === true || userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
+      const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
+      if (isBiometricAuth && isUserBiometricEnabled) {
+        isPinMatch = true;
+      } else if (isMock) {
+        isPinMatch = (pin === "1234" || (Boolean(pin) && pin === currentPlainPin) || (pinHash && Boolean(pin) && bcrypt.compareSync(pin!, pinHash)));
+      } else if (pin && pinHash) {
         isPinMatch = bcrypt.compareSync(pin, pinHash);
-      } else if (currentPlainPin) {
+      } else if (pin && currentPlainPin) {
         isPinMatch = (pin === currentPlainPin);
       } else {
         return {
@@ -637,7 +657,7 @@ export async function POST(req: Request) {
       gatewayUrl,
     });
     return NextResponse.json({
-      error: "Internal processing error occurred while executing transfer.",
+      error: "Unable to complete transfer at this time. If your transaction amount exceeds your account Tier limit, please upgrade your Tier or contact Support for assistance.",
       details: error.message,
       stack: error.stack,
       requestBody,

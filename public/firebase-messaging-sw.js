@@ -19,10 +19,13 @@ messaging.onBackgroundMessage((payload) => {
   console.log("[firebase-messaging-sw.js] Background message received: ", payload);
 
   const notificationTitle = payload.notification?.title || payload.data?.title || "E-Tech Notification";
+  const bannerImage = payload.notification?.image || payload.data?.imageUrl || payload.data?.bannerUrl || payload.data?.image || "";
+
   const notificationOptions = {
     body: payload.notification?.body || payload.data?.body || "You have a new transaction or security update.",
     icon: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
     badge: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+    ...(bannerImage ? { image: bannerImage } : {}),
     data: payload.data || {},
   };
 
@@ -47,19 +50,14 @@ self.addEventListener("notificationclick", (event) => {
     const safeUrl = new URL("/", appOrigin);
     safeUrl.searchParams.set("txRef", cleanRef);
     destinationUrl = safeUrl.toString();
-  } else {
-    // Validate rawUrl origin and path strictly using URL parsing
+  } else if (rawUrl && typeof rawUrl === "string") {
     try {
       const parsed = new URL(rawUrl, appOrigin);
-      if (parsed.origin === appOrigin && (parsed.pathname === "/" || parsed.pathname === "")) {
-        const txParam = parsed.searchParams.get("txRef") || parsed.searchParams.get("transactionReference") || parsed.searchParams.get("reference");
-        if (txParam && /^[A-Za-z0-9_\-]+$/.test(txParam)) {
-          const safeUrl = new URL("/", appOrigin);
-          safeUrl.searchParams.set("txRef", txParam);
-          destinationUrl = safeUrl.toString();
-        } else {
-          destinationUrl = appOrigin + "/";
-        }
+      // Support both same-origin internal app routes (e.g. /store, /bills) and external web links
+      if (parsed.origin === appOrigin) {
+        destinationUrl = parsed.toString();
+      } else if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        destinationUrl = parsed.toString();
       }
     } catch {
       destinationUrl = appOrigin + "/";
@@ -68,7 +66,15 @@ self.addEventListener("notificationclick", (event) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-      // Find existing window matching exact origin
+      // For external URLs, open a new window
+      const parsedDest = new URL(destinationUrl, appOrigin);
+      if (parsedDest.origin !== appOrigin) {
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(destinationUrl);
+        }
+      }
+
+      // Find existing window matching exact app origin
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i];
         try {

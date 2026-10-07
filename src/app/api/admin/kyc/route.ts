@@ -1,9 +1,134 @@
 import { NextResponse } from "next/server";
 import { mintFirebaseIdToken } from "@/lib/admin-auth";
 import { requireAdminPermission } from "@/lib/admin-permissions";
-import { adminDb, adminApp } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin";
+import { WalletService } from "@/services/wallet-service";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+
+async function autoReleaseUserHeldDeposits(userId: string, adminEmail: string) {
+  try {
+    const heldSnap = await adminDb.collection("transactions")
+      .where("userId", "==", userId)
+      .where("status", "==", "HELD_LIMIT_EXCEEDED")
+      .get();
+
+    if (heldSnap.empty) return;
+
+    for (const doc of heldSnap.docs) {
+      const txData = doc.data();
+      const amountNum = Number(txData.metadata?.heldAmount ?? txData.amount ?? 0);
+      const reference = txData.reference || doc.id;
+
+      if (amountNum > 0) {
+        await adminDb.runTransaction(async (transaction) => {
+          await WalletService.creditWallet(transaction, {
+            userId,
+            amount: amountNum,
+            currency: txData.currency || "NGN",
+            reference: `RELEASE-${reference}`,
+            docId: doc.id,
+            description: `Release of Held Deposit (Ref: ${reference})`,
+            recipientName: txData.recipientName || "Wallet Credit",
+            type: "DEPOSIT",
+            category: "DEPOSIT",
+            direction: "CREDIT",
+            narration: "Held deposit released automatically upon KYC approval",
+            totalCredited: amountNum,
+            fundingMethod: txData.fundingMethod || "Virtual Account",
+            senderName: txData.senderName,
+            senderAccountNumber: txData.senderAccountNumber,
+            senderBankName: txData.senderBankName,
+            virtualAccountNumber: txData.virtualAccountNumber,
+            virtualAccountBankName: txData.virtualAccountBankName,
+            metadata: {
+              ...txData.metadata,
+              wasHeldReleased: true,
+              releasedBy: adminEmail,
+              releasedAt: new Date().toISOString(),
+              releasedOnKycApproval: true,
+            },
+          });
+
+          transaction.update(doc.ref, {
+            status: "SUCCESS",
+            totalCredited: amountNum,
+            description: `Release of Held Deposit (Ref: ${reference})`,
+            narration: "Held deposit released automatically upon KYC approval",
+            completedAt: new Date().toISOString(),
+            "metadata.wasHeldReleased": true,
+            "metadata.releasedAt": new Date().toISOString(),
+            "metadata.releasedBy": adminEmail,
+          });
+        });
+
+        const { NotificationService } = await import("@/services/notification-service");
+        NotificationService.sendPushNotification(userId, {
+          title: "Held Deposit Released 💰",
+          body: `Your held deposit of ₦${amountNum.toLocaleString("en-NG")} has been released and credited to your wallet balance following your KYC verification!`,
+          type: "transaction",
+          reference,
+          amount: amountNum,
+          url: "/history",
+        }).catch(() => {});
+      }
+    }
+
+    await adminDb.collection("users").doc(userId).update({
+      depositLimitExceeded: false,
+      heldDepositCount: 0,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    console.warn("[KYC Auto-Release Held Deposits Warning]:", err.message);
+  }
+}
+
+async function resolveTierLimits(assignedTier: string, customDaily?: number, customSingle?: number, customMaxBalance?: number) {
+  let appData: Record<string, any> = {};
+  try {
+    const appDoc = await adminDb.collection("config").doc("app").get();
+    if (appDoc.exists) {
+      appData = appDoc.data() || {};
+    }
+  } catch (err: any) {
+    console.warn("[Resolve Tier Limits Warning]:", err.message);
+  }
+
+  let defaultDaily = 500000;
+  let defaultSingle = 200000;
+  let defaultMaxBalance = 300000;
+
+  if (assignedTier === "Tier 3") {
+    defaultDaily = Number(appData.tier3DailyTransferLimit ?? appData.tier3DailyLimit ?? 50000000);
+    defaultSingle = Number(appData.tier3SingleTransferLimit ?? appData.tier3SingleLimit ?? 10000000);
+    defaultMaxBalance = Number(appData.tier3MaxBalance ?? 50000000);
+  } else if (assignedTier === "Tier 2") {
+    defaultDaily = Number(appData.tier2DailyTransferLimit ?? appData.tier2DailyLimit ?? 5000000);
+    defaultSingle = Number(appData.tier2SingleTransferLimit ?? appData.tier2SingleLimit ?? 2000000);
+    defaultMaxBalance = Number(appData.tier2MaxBalance ?? 5000000);
+  } else {
+    defaultDaily = Number(appData.tier1DailyTransferLimit ?? appData.tier1DailyLimit ?? 500000);
+    defaultSingle = Number(appData.tier1SingleTransferLimit ?? appData.tier1SingleLimit ?? 200000);
+    defaultMaxBalance = Number(appData.tier1MaxBalance ?? 300000);
+  }
+
+  const hasCustomDaily = typeof customDaily === "number" && customDaily > 0 && customDaily !== defaultDaily;
+  const hasCustomSingle = typeof customSingle === "number" && customSingle > 0 && customSingle !== defaultSingle;
+  const hasCustomMaxBalance = typeof customMaxBalance === "number" && customMaxBalance > 0 && customMaxBalance !== defaultMaxBalance;
+  const isCustom = hasCustomDaily || hasCustomSingle || hasCustomMaxBalance;
+
+  const finalDaily = typeof customDaily === "number" && customDaily > 0 ? customDaily : defaultDaily;
+  const finalSingle = typeof customSingle === "number" && customSingle > 0 ? customSingle : defaultSingle;
+  const finalMaxBalance = typeof customMaxBalance === "number" && customMaxBalance > 0 ? customMaxBalance : defaultMaxBalance;
+
+  return {
+    dailyLimit: finalDaily,
+    singleLimit: finalSingle,
+    maxBalance: finalMaxBalance,
+    hasCustomLimits: isCustom,
+  };
+}
 
 async function parseResponseJson(response: Response, defaultMessage: string) {
   try {
@@ -252,21 +377,29 @@ export async function POST(req: Request) {
       idToken = await mintFirebaseIdToken(uid);
     }
 
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     if (action === "approve") {
       if (!provider || (provider !== "flutterwave" && provider !== "squad")) {
         return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected." }, { status: 400 });
       }
 
-      // Forward approval request to payment-gateway secure human-only endpoint with strict Bearer Authorization header and explicit provider in body
+      const assignedTier = requestBody.tier || "Tier 2";
+      const customDaily = requestBody.dailyLimit !== undefined && requestBody.dailyLimit !== null && requestBody.dailyLimit !== "" ? Number(requestBody.dailyLimit) : undefined;
+      const customSingle = requestBody.singleLimit !== undefined && requestBody.singleLimit !== null && requestBody.singleLimit !== "" ? Number(requestBody.singleLimit) : undefined;
+      const customMaxBalance = requestBody.maxBalance !== undefined && requestBody.maxBalance !== null && requestBody.maxBalance !== "" ? Number(requestBody.maxBalance) : undefined;
+
+      const limits = await resolveTierLimits(assignedTier, customDaily, customSingle, customMaxBalance);
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      };
+      if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
       const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/approve`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": gatewayApiKey,
-          "Authorization": `Bearer ${idToken}`
-        },
+        headers,
         body: JSON.stringify({ provider })
       });
 
@@ -275,11 +408,57 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: result.message || "Failed to approve KYC in gateway." }, { status: response.status });
       }
 
+      // Update user and wallet documents in Firestore globally with approved Tier level and limits
+      const adminEmail = perm.auth?.email || "admin@system";
+      const customBalance = requestBody.balance !== undefined && requestBody.balance !== null && requestBody.balance !== "" ? Number(requestBody.balance) : undefined;
+
+      const userUpdatePayload: Record<string, any> = {
+        tier: assignedTier,
+        dailyLimit: limits.dailyLimit,
+        dailyTransferLimit: limits.dailyLimit,
+        singleLimit: limits.singleLimit,
+        maxSingleTransferLimit: limits.singleLimit,
+        maxBalance: limits.maxBalance,
+        maxAccountBalance: limits.maxBalance,
+        hasCustomLimits: limits.hasCustomLimits,
+        kycStatus: "VERIFIED",
+        kycVerifiedAt: new Date().toISOString(),
+        kycVerifiedBy: adminEmail,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (typeof customBalance === "number" && !isNaN(customBalance) && customBalance >= 0) {
+        userUpdatePayload.balance = customBalance;
+      }
+
+      await adminDb.collection("users").doc(targetUid).set(userUpdatePayload, { merge: true });
+
+      const walletUpdatePayload: Record<string, any> = {
+        tier: assignedTier,
+        dailyLimit: limits.dailyLimit,
+        dailyTransferLimit: limits.dailyLimit,
+        singleLimit: limits.singleLimit,
+        maxSingleTransferLimit: limits.singleLimit,
+        maxBalance: limits.maxBalance,
+        maxAccountBalance: limits.maxBalance,
+        hasCustomLimits: limits.hasCustomLimits,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (typeof customBalance === "number" && !isNaN(customBalance) && customBalance >= 0) {
+        walletUpdatePayload.balance = customBalance;
+      }
+
+      await adminDb.collection("wallets").doc(`${targetUid}_NGN`).set(walletUpdatePayload, { merge: true });
+
+      // Auto-release any pending held deposits for this user now that KYC is approved
+      await autoReleaseUserHeldDeposits(targetUid, adminEmail);
+
       try {
         const { NotificationService } = await import("@/services/notification-service");
         await NotificationService.sendPushNotification(targetUid, {
           title: "KYC Verified! 🎉",
-          body: "Congratulations! Your identity verification has been approved. Your virtual account is ready for full platform access.",
+          body: `Congratulations! Your identity verification has been approved for ${assignedTier}. Your daily transfer limit is ₦${limits.dailyLimit.toLocaleString("en-NG")}.`,
           type: "security"
         });
       } catch (notifErr: any) {
@@ -292,14 +471,15 @@ export async function POST(req: Request) {
       });
 
     } else if (action === "reject") {
-      // Forward rejection request to payment-gateway secure human-only endpoint with strict Bearer Authorization header
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      };
+      if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
       const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/reject`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": gatewayApiKey,
-          "Authorization": `Bearer ${idToken}`
-        },
+        headers,
         body: JSON.stringify({ reason })
       });
 
@@ -318,14 +498,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected for retry." }, { status: 400 });
       }
 
-      // Forward retry provisioning request to payment-gateway
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      };
+      if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
       const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/retry-provisioning`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": gatewayApiKey,
-          "Authorization": `Bearer ${idToken}`
-        },
+        headers,
         body: JSON.stringify({ provider })
       });
 
@@ -347,7 +528,6 @@ export async function POST(req: Request) {
         });
       }
 
-      // Update Firestore user document
       const userRef = adminDb.collection("users").doc(targetUid);
       await userRef.update({
         kycStatus: "UNVERIFIED",
@@ -359,7 +539,6 @@ export async function POST(req: Request) {
         nin: null
       });
 
-      // Clear matching document from kyc_submissions collection
       try {
         const subQuery = await adminDb.collection("kyc_submissions")
           .where("userId", "==", targetUid)
@@ -372,8 +551,6 @@ export async function POST(req: Request) {
       } catch (subErr: any) {
         console.error(`[Admin KYC reset_kyc] Error deleting submissions:`, subErr.message);
       }
-
-      console.log(`[Admin KYC reset_kyc] KYC status reset to UNVERIFIED for user ${targetUid}`);
 
       return NextResponse.json({
         success: true,
@@ -388,7 +565,6 @@ export async function POST(req: Request) {
         });
       }
 
-      // Read target user first to ensure they are indeed unverified (kycStatus !== 'VERIFIED')
       const targetUserDoc = await adminDb.collection("users").doc(targetUid).get();
       if (!targetUserDoc.exists) {
         return NextResponse.json({ error: "User profile not found in system records." }, { status: 404 });
@@ -403,7 +579,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Access denied: Administrative accounts cannot be deleted." }, { status: 403 });
       }
 
-      // Delete from Firebase Auth
       const { deleteFirebaseAuthUser } = await import("@/lib/firebase-auth-rest");
       try {
         await deleteFirebaseAuthUser(targetUid);
@@ -411,13 +586,12 @@ export async function POST(req: Request) {
         console.warn(`[Admin KYC delete_unverified] User not found or error in Firebase Auth:`, authErr.message);
       }
 
-      // Delete user document from Firestore
       await adminDb.collection("users").doc(targetUid).delete();
 
-      // Delete associated collections
       try {
         const batch = adminDb.batch();
-        // Delete wallets
+
+        // Delete wallet docs by query
         const walletsQuery = await adminDb.collection("wallets")
           .where("userId", "==", targetUid)
           .get();
@@ -425,13 +599,19 @@ export async function POST(req: Request) {
           batch.delete(doc.ref);
         });
 
-        // Delete submissions
+        // Delete explicit multi-currency wallet doc IDs
+        batch.delete(adminDb.collection("wallets").doc(`${targetUid}_NGN`));
+        batch.delete(adminDb.collection("wallets").doc(`${targetUid}_USD`));
+        batch.delete(adminDb.collection("wallets").doc(`${targetUid}_XOF`));
+
+        // Delete kyc_submissions
         const subQuery = await adminDb.collection("kyc_submissions")
           .where("userId", "==", targetUid)
           .get();
         subQuery.forEach(doc => {
           batch.delete(doc.ref);
         });
+        batch.delete(adminDb.collection("kyc_submissions").doc(targetUid));
 
         await batch.commit();
       } catch (colErr: any) {
@@ -440,7 +620,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        message: "Unverified user profile and associated data permanently purged from the server."
+        message: "User profile and associated data permanently purged from the server."
       });
 
     } else {

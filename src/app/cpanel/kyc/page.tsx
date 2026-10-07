@@ -51,9 +51,21 @@ function CpanelKycPageContent() {
   const [kycHasMore, setKycHasMore] = useState(false);
   const [kycTotalCount, setKycTotalCount] = useState(0);
 
-  // Inspector and Editor Drawer States
+  // Dynamic Tier Levels state
+  const [tierOptions, setTierOptions] = useState<{ id: string; name: string; dailyLimit: number; singleLimit: number; maxBalance: number }[]>([
+    { id: "tier_1", name: "Tier 1", dailyLimit: 500000, singleLimit: 200000, maxBalance: 300000 },
+    { id: "tier_2", name: "Tier 2", dailyLimit: 5000000, singleLimit: 2000000, maxBalance: 5000000 },
+    { id: "tier_3", name: "Tier 3", dailyLimit: 50000000, singleLimit: 10000000, maxBalance: 50000000 },
+  ]);
+
+  // Inspector, Editor & Approval Drawer States
   const [inspectingUser, setInspectingUser] = useState<PendingKycUser | null>(null);
   const [editingUser, setEditingUser] = useState<PendingKycUser | null>(null);
+  const [approvingKycUser, setApprovingKycUser] = useState<PendingKycUser | null>(null);
+  const [approveTier, setApproveTier] = useState<string>("Tier 2");
+  const [approveProvider, setApproveProvider] = useState<"flutterwave" | "squad">("flutterwave");
+  const [approveDailyLimit, setApproveDailyLimit] = useState<number>(5000000);
+  const [approveSingleLimit, setApproveSingleLimit] = useState<number>(2000000);
 
   // Edit form state
   const [editName, setEditName] = useState("");
@@ -202,7 +214,67 @@ function CpanelKycPageContent() {
 
   useEffect(() => {
     fetchPendingKyc(false, kycTab);
+    fetchTierLevels();
   }, [kycTab]);
+
+  const fetchTierLevels = async () => {
+    try {
+      const res = await fetch("/api/admin/tier-levels");
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.tierLevels) && data.tierLevels.length > 0) {
+        setTierOptions(data.tierLevels);
+      }
+    } catch {
+      // Ignore background tier level fetch errors
+    }
+  };
+
+  const handleKycApproveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!approvingKycUser) return;
+
+    setIsProcessingKyc(approvingKycUser.uid);
+    toast.loading("Approving KYC, setting transaction limits & provisioning account...");
+
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/kyc", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          action: "approve",
+          targetUid: approvingKycUser.uid,
+          provider: approveProvider,
+          tier: approveTier,
+          dailyLimit: approveDailyLimit,
+          singleLimit: approveSingleLimit,
+        }),
+      });
+
+      toast.dismiss();
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "KYC Approved and virtual account provisioned!");
+        setPendingKycUser((prev) => prev.filter((u) => u.uid !== approvingKycUser.uid));
+        setApprovingKycUser(null);
+      } else {
+        toast.error(data.error || "Failed to approve KYC.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("API connection error during KYC approval.");
+    } finally {
+      setIsProcessingKyc(null);
+    }
+  };
 
   const handleProcessKyc = async (targetUid: string, action: "verify" | "approve" | "reject" | "retry" | "move_to_pending") => {
     setIsProcessingKyc(targetUid);
@@ -234,7 +306,7 @@ function CpanelKycPageContent() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ action, targetUid, reason, provider }),
+        body: JSON.stringify({ action, targetUid, reason, provider, tier: "Tier 2" }),
       });
 
       const data = await res.json();
@@ -335,7 +407,15 @@ function CpanelKycPageContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link
+              href="/cpanel/limits"
+              className="px-3.5 h-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[18px]">tune</span>
+              <span>Account Limits Manager</span>
+            </Link>
+
             <button
               type="button"
               onClick={toggleTheme}
@@ -344,6 +424,7 @@ function CpanelKycPageContent() {
               <span className="material-symbols-outlined text-[18px]">{isDark ? "light_mode" : "dark_mode"}</span>
               <span className="hidden sm:inline">{isDark ? "Light Mode" : "Dark Mode"}</span>
             </button>
+
             <Link
               href="/cpanel"
               className="px-4 h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5"
@@ -530,7 +611,13 @@ function CpanelKycPageContent() {
                             icon: "verified",
                             variant: "emerald",
                             disabled: !(u.kycStatus === "IDENTITY_VERIFIED" || u.kycStatus === "PENDING" || u.kycStatus === "UNVERIFIED"),
-                            onClick: () => handleProcessKyc(u.uid, "approve"),
+                            onClick: () => {
+                              setApprovingKycUser(u);
+                              setApproveProvider(selectedProvider[u.uid] || "flutterwave");
+                              setApproveTier("Tier 2");
+                              setApproveDailyLimit(5000000);
+                              setApproveSingleLimit(2000000);
+                            },
                           },
                           {
                             label: "Retry Provisioning",
@@ -550,11 +637,22 @@ function CpanelKycPageContent() {
                             label: "Delete User",
                             icon: "delete_forever",
                             variant: "danger",
-                            disabled: u.kycStatus !== "UNVERIFIED",
+                            disabled: u.kycStatus !== "UNVERIFIED" && u.kycStatus !== "REJECTED",
                             onClick: () => handleDeleteUnverifiedUser(u.uid, u.name),
                           },
                         ]}
                       />
+
+                      {(u.kycStatus === "UNVERIFIED" || u.kycStatus === "REJECTED") && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUnverifiedUser(u.uid, u.name)}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+                          <span>Delete {u.kycStatus === "REJECTED" ? "Rejected" : "Unverified"} User</span>
+                        </button>
+                      )}
                     </div>
 
                     {u.kycStatus !== "REJECTED" && u.kycStatus !== "VERIFIED" && u.kycStatus !== "UNVERIFIED" && (
@@ -688,23 +786,41 @@ function CpanelKycPageContent() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-gray-200/50 dark:border-gray-800">
-              <button
-                type="button"
-                onClick={() => {
-                  openEditingModal(inspectingUser);
-                }}
-                className="px-4 py-2 bg-[#FC7A00] text-white text-xs font-bold uppercase rounded-xl hover:bg-[#e06c00] transition-all"
-              >
-                Edit KYC Information
-              </button>
-              <button
-                type="button"
-                onClick={() => setInspectingUser(null)}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all"
-              >
-                Close
-              </button>
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-200/50 dark:border-gray-800 flex-wrap">
+              {inspectingUser.kycStatus === "UNVERIFIED" || inspectingUser.kycStatus === "REJECTED" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetUid = inspectingUser.uid;
+                    const name = inspectingUser.name;
+                    handleDeleteUnverifiedUser(targetUid, name);
+                  }}
+                  className="px-4 py-2 bg-rose-600 text-white text-xs font-extrabold uppercase rounded-xl hover:bg-rose-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                  <span>Delete {inspectingUser.kycStatus === "REJECTED" ? "Rejected" : "Unverified"} User</span>
+                </button>
+              ) : (
+                <div />
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    openEditingModal(inspectingUser);
+                  }}
+                  className="px-4 py-2 bg-[#FC7A00] text-white text-xs font-bold uppercase rounded-xl hover:bg-[#e06c00] transition-all cursor-pointer"
+                >
+                  Edit KYC Information
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectingUser(null)}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -819,6 +935,115 @@ function CpanelKycPageContent() {
                     <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   )}
                   <span>Save KYC Details</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* KYC Approval & Transaction Limits Customizer Modal */}
+      {approvingKycUser && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+          <div className={cn("w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5", panelClass)}>
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-emerald-500 text-[24px]">verified</span>
+                <div>
+                  <h3 className="text-base font-extrabold uppercase">Approve KYC & Set Limits</h3>
+                  <p className="text-[10px] text-gray-400">Set customer Tier level and transaction limits.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setApprovingKycUser(null)}
+                className="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleKycApproveSubmit} className="space-y-4 text-xs">
+              <div className="p-3.5 bg-gray-50 dark:bg-gray-800 rounded-2xl border space-y-1">
+                <span className="text-[10px] font-black uppercase text-gray-400">Customer</span>
+                <p className="font-extrabold text-sm text-gray-900 dark:text-white">{approvingKycUser.name}</p>
+                <p className="font-mono text-[11px] text-gray-400">{approvingKycUser.email}</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase text-gray-400">Virtual Account Gateway Provider *</label>
+                <select
+                  value={approveProvider}
+                  onChange={(e) => setApproveProvider(e.target.value as any)}
+                  className={cn(inputClass, "cursor-pointer font-bold")}
+                >
+                  <option value="flutterwave">Flutterwave Gateway Rail</option>
+                  <option value="squad">Squadco (GTBank) Virtual Account Rail</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase text-gray-400">Assign Tier Level *</label>
+                <select
+                  value={approveTier}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setApproveTier(val);
+                    const matched = tierOptions.find((t) => t.name === val || t.id === val);
+                    if (matched) {
+                      setApproveDailyLimit(matched.dailyLimit);
+                      setApproveSingleLimit(matched.singleLimit);
+                    }
+                  }}
+                  className={cn(inputClass, "cursor-pointer font-bold")}
+                >
+                  {tierOptions.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} (₦{t.dailyLimit.toLocaleString("en-NG")} / Day)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase text-gray-400">Daily Transfer Limit (₦)</label>
+                <input
+                  type="number"
+                  required
+                  min={100000}
+                  value={approveDailyLimit}
+                  onChange={(e) => setApproveDailyLimit(Number(e.target.value))}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase text-gray-400">Single Transfer Limit (₦)</label>
+                <input
+                  type="number"
+                  required
+                  min={50000}
+                  value={approveSingleLimit}
+                  onChange={(e) => setApproveSingleLimit(Number(e.target.value))}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-200/50 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setApprovingKycUser(null)}
+                  disabled={!!isProcessingKyc}
+                  className="px-4 py-2.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!!isProcessingKyc}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isProcessingKyc && <ButtonSpinner />}
+                  <span>Approve & Set Limits</span>
                 </button>
               </div>
             </form>

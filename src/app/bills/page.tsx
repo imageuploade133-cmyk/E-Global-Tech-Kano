@@ -606,11 +606,11 @@ export default function GenericBillPage() {
   };
 
   // Final Payment execution
-  const executePayment = async (pin: string) => {
+  const executePayment = async (pin?: string, isBiometricAuthenticated?: boolean) => {
     setIsPaying(true);
     setIsPinModalOpen(false);
     setIsCheckoutModalOpen(false);
-    toast.loading("Verifying your transaction PIN securely...");
+    toast.loading("Verifying transaction authorization securely...");
 
     try {
       let idToken = "mock-token";
@@ -624,12 +624,12 @@ export default function GenericBillPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ action: "verify", pin }),
+        body: JSON.stringify({ action: "verify", pin, isBiometricAuthenticated }),
       });
 
       const pinData = await pinVerifyRes.json();
       if (!pinVerifyRes.ok || !pinData.success) {
-        throw new Error(pinData.message || "Incorrect transaction PIN. Please try again.");
+        throw new Error(pinData.error || pinData.message || "Authorization failed. Please try again.");
       }
 
       toast.loading("Processing your transaction with gateway...");

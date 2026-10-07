@@ -1,6 +1,7 @@
 /**
  * Centralized Image Upload and URL Validation Utilities
  */
+import { auth } from "@/lib/firebase";
 
 export interface ImageMetadata {
   imageProvider: string;
@@ -11,6 +12,7 @@ export interface ImageMetadata {
   uploadedAt: string;
   verifiedAt?: string;
   status: "VERIFIED_ACTIVE" | "UNVERIFIED" | "FAILED";
+  ownerUid?: string;
 }
 
 export interface UploadResult {
@@ -32,14 +34,26 @@ export async function validateImageUrl(url: string, timeoutMs = 5000): Promise<{
 
   const trimmed = url.trim();
 
-  // Basic format check
-  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-    return { valid: false, error: "URL must start with http:// or https://" };
+  // Strict URL Parsing Validation
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(trimmed);
+  } catch {
+    return { valid: false, error: "Malformed URL" };
   }
 
-  // Reject viewer/page URLs from ImgBB or other providers if known
-  if (trimmed.includes("ibb.co/") && !trimmed.includes("i.ibb.co/")) {
-    return { valid: false, error: "URL is an HTML viewer page (ibb.co/id), direct file URL required (i.ibb.co/...)" };
+  if (parsedUrl.protocol !== "https:") {
+    return { valid: false, error: "URL protocol must be strictly https:" };
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+
+  // Strict domain equality check: direct image URLs must be hosted strictly on i.ibb.co
+  if (hostname !== "i.ibb.co") {
+    if (hostname === "ibb.co") {
+      return { valid: false, error: "URL is an HTML viewer page (ibb.co/id), direct file URL required (i.ibb.co/...)" };
+    }
+    return { valid: false, error: "Direct image URL must be hosted strictly on i.ibb.co" };
   }
 
   try {
@@ -75,7 +89,7 @@ export async function validateImageUrl(url: string, timeoutMs = 5000): Promise<{
     if (!response || !response.ok) {
       // If server-to-server HTTP request failed (e.g. sandbox network restriction or remote host blocking HEAD/GET),
       // perform a graceful format verification for trusted direct image domain structures (e.g. i.ibb.co)
-      if (trimmed.includes("i.ibb.co/") || trimmed.includes("images.") || /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(trimmed)) {
+      if (hostname === "i.ibb.co" || /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(parsedUrl.pathname)) {
         return { valid: true };
       }
       return {
@@ -150,14 +164,54 @@ export async function uploadImageSecurely(
   purpose = "general",
   onProgress?: (percent: number) => void
 ): Promise<UploadResult> {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     try {
+      // Get authenticated Firebase ID token if user is signed in
+      let idToken = "";
+      try {
+        if (auth && auth.currentUser) {
+          idToken = await auth.currentUser.getIdToken(true);
+        } else if (typeof window !== "undefined" && (window as any).firebaseUserToken) {
+          idToken = (window as any).firebaseUserToken;
+        }
+
+        if (!idToken && auth) {
+          await new Promise<void>((res) => {
+            const unsubscribe = auth.onAuthStateChanged(async (u) => {
+              if (u) {
+                try {
+                  idToken = await u.getIdToken(true);
+                } catch (_) {}
+              }
+              unsubscribe();
+              res();
+            });
+            setTimeout(() => {
+              unsubscribe();
+              res();
+            }, 1500);
+          });
+        }
+      } catch (authErr: any) {
+        console.warn("[uploadImageSecurely] Could not retrieve Firebase ID token:", authErr.message);
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("purpose", purpose);
 
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/upload-image");
+      xhr.withCredentials = true;
+
+      if (idToken) {
+        xhr.setRequestHeader("Authorization", `Bearer ${idToken}`);
+      }
+
+      const sessionId = typeof window !== "undefined" ? (localStorage.getItem("active_session_id") || "") : "";
+      if (sessionId) {
+        xhr.setRequestHeader("X-Session-ID", sessionId);
+      }
 
       if (xhr.upload && onProgress) {
         onProgress(5);

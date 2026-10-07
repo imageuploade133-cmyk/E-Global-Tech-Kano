@@ -34,7 +34,6 @@ function CpanelBankLogosPageContent() {
   const [banks, setBanks] = useState<BankItem[]>([]);
   const [isLoadingBanks, setIsLoadingBanks] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [imgbbApiKey, setImgbbApiKey] = useState("");
 
   // Track editing inputs & uploading/toggling states per bankId
   const [editingLogos, setEditingLogos] = useState<Record<string, string>>({});
@@ -80,22 +79,6 @@ function CpanelBankLogosPageContent() {
     }
     checkSession();
   }, [router]);
-
-  // Fetch Admin App Config for ImgBB Key
-  useEffect(() => {
-    async function fetchConfig() {
-      try {
-        const res = await fetch("/api/admin/config");
-        const data = await res.json();
-        if (data.config?.imgbbApiKey) {
-          setImgbbApiKey(data.config.imgbbApiKey);
-        }
-      } catch (err) {
-        console.warn("Failed to fetch admin config:", err);
-      }
-    }
-    fetchConfig();
-  }, []);
 
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -472,7 +455,7 @@ function CpanelBankLogosPageContent() {
                           type="button"
                           disabled={isUploading}
                           className={cn("w-10 h-10 border rounded-xl flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
-                          title="Upload image file to ImgBB"
+                          title="Upload image file"
                         >
                           {isUploading ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
                         </button>

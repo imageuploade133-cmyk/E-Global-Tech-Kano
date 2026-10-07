@@ -1,14 +1,13 @@
 "use client";
-import { useCpanelTheme } from "@/lib/CpanelThemeContext";
-
-
 
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
 interface AdminUserRecord {
   uid: string;
@@ -51,6 +50,7 @@ function CpanelAdminsPageContent() {
   const [newDisplayName, setNewDisplayName] = useState("");
   const [newPhoneNumber, setNewPhoneNumber] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newPin, setNewPin] = useState("");
   const [newRole, setNewRole] = useState<AdminUserRecord["role"]>("admin");
   const [newPermissions, setNewPermissions] = useState<string[]>(["users.view", "transactions.view", "kyc.view"]);
   const [isCreating, setIsCreating] = useState(false);
@@ -60,10 +60,10 @@ function CpanelAdminsPageContent() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [deletingUid, setDeletingUid] = useState<string | null>(null);
 
-  // Theme Syncing
-
-
-
+  // Set PIN state
+  const [pinTargetAdmin, setPinTargetAdmin] = useState<AdminUserRecord | null>(null);
+  const [adminAccessPin, setAdminAccessPin] = useState("");
+  const [isSavingAdminPin, setIsSavingAdminPin] = useState(false);
 
   // Auth & Session Check
   useEffect(() => {
@@ -126,6 +126,11 @@ function CpanelAdminsPageContent() {
       return;
     }
 
+    if (newPin && (newPin.length !== 4 || isNaN(Number(newPin)))) {
+      toast.error("Access PIN must be a 4-digit numeric code.");
+      return;
+    }
+
     setIsCreating(true);
     try {
       const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
@@ -145,6 +150,7 @@ function CpanelAdminsPageContent() {
             phoneNumber: newPhoneNumber,
             role: newRole,
             permissions: newPermissions,
+            pin: newPin,
           },
         }),
       });
@@ -156,6 +162,7 @@ function CpanelAdminsPageContent() {
         setNewDisplayName("");
         setNewPhoneNumber("");
         setNewPassword("");
+        setNewPin("");
         setNewPermissions(["users.view", "transactions.view", "kyc.view"]);
         fetchAdmins();
       } else {
@@ -207,6 +214,55 @@ function CpanelAdminsPageContent() {
       toast.error(err.message || "Network error updating administrator.");
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleSaveAdminPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pinTargetAdmin) return;
+
+    if (adminAccessPin.length !== 4 || isNaN(Number(adminAccessPin))) {
+      toast.error("Access PIN must be a 4-digit numeric code.");
+      return;
+    }
+
+    setIsSavingAdminPin(true);
+    toast.loading(`Setting Access PIN for ${pinTargetAdmin.displayName || pinTargetAdmin.email}...`);
+
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/admins", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "set_pin",
+          adminData: {
+            targetUid: pinTargetAdmin.uid,
+            pin: adminAccessPin,
+          },
+        }),
+      });
+
+      toast.dismiss();
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast.success(data.message || "Access PIN successfully created and updated!");
+        setPinTargetAdmin(null);
+        setAdminAccessPin("");
+        fetchAdmins();
+      } else {
+        toast.error(data.error || "Failed to set Access PIN.");
+      }
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || "Network error setting Access PIN.");
+    } finally {
+      setIsSavingAdminPin(false);
     }
   };
 
@@ -281,7 +337,7 @@ function CpanelAdminsPageContent() {
                 <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Admin Management</h1>
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                Provision Administrators, assign granular permissions, and enforce Role-Based Access Control (RBAC).
+                Provision Administrators, set Access PINs, assign granular permissions, and enforce Role-Based Access Control (RBAC).
               </p>
             </div>
           </div>
@@ -339,26 +395,42 @@ function CpanelAdminsPageContent() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 block">WhatsApp Phone Number (OTP Rail)</label>
+                <label className="text-[10px] font-black uppercase text-gray-400 block">WhatsApp Phone Number</label>
                 <input
                   type="tel"
-                  placeholder="e.g. +2348033123456 or 08033123456"
+                  placeholder="e.g. +2348033123456"
                   value={newPhoneNumber}
                   onChange={(e) => setNewPhoneNumber(e.target.value)}
                   className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 block">Initial Password *</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="At least 6 characters"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Initial Password *</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="6+ chars"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-amber-500 block">Access PIN (4 Digits)</label>
+                  <input
+                    type="password"
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    maxLength={4}
+                    placeholder="e.g. 1234"
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-mono font-bold outline-none border transition-all w-full", inputClass)}
+                  />
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -370,7 +442,7 @@ function CpanelAdminsPageContent() {
                 >
                   <option value="super_admin">SUPER ADMIN (Full Access)</option>
                   <option value="admin">ADMIN (Standard Operations)</option>
-                  <option value="finance">FINANCE (Withdrawals & Deposits)</option>
+                  <option value="finance">FINANCE (Withdrawals &amp; Deposits)</option>
                   <option value="kyc_admin">KYC ADMIN (Document Approvals)</option>
                   <option value="support">SUPPORT (Customer Helpdesk)</option>
                   <option value="read_only">READ ONLY (Auditor)</option>
@@ -460,7 +532,19 @@ function CpanelAdminsPageContent() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAdminAccessPin("");
+                              setPinTargetAdmin(adm);
+                            }}
+                            className="px-3 h-8 bg-amber-500/10 hover:bg-amber-500 hover:text-white text-amber-600 dark:text-amber-400 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center gap-1 cursor-pointer border border-amber-500/20"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">lock_reset</span>
+                            <span>Set PIN</span>
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => setEditingAdmin(adm)}
@@ -495,6 +579,75 @@ function CpanelAdminsPageContent() {
           </div>
 
         </div>
+
+        {/* Set Admin Access PIN Modal Drawer */}
+        <AnimatePresence>
+          {pinTargetAdmin && (
+            <div className="fixed inset-0 z-[100000] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className={cn("w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5", isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900")}
+              >
+                <div className="flex justify-between items-center border-b pb-3 border-gray-200/50">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-500 text-[22px]">lock_reset</span>
+                    <h3 className="font-extrabold text-sm uppercase">Create Admin Access PIN</h3>
+                  </div>
+                  <button onClick={() => setPinTargetAdmin(null)} className="w-8 h-8 rounded-full border flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white cursor-pointer">
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveAdminPin} className="space-y-4">
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1 text-center">
+                    <p className="text-[10px] font-black uppercase text-amber-500">Target Administrator Profile</p>
+                    <p className="font-extrabold text-base text-gray-900 dark:text-white">{pinTargetAdmin.displayName || pinTargetAdmin.email}</p>
+                    <p className="font-mono text-xs text-gray-400 select-all">{pinTargetAdmin.email}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block text-center">
+                      New 4-Digit Access PIN
+                    </label>
+                    <input
+                      type="password"
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      maxLength={4}
+                      required
+                      placeholder="e.g. 1234"
+                      value={adminAccessPin}
+                      onChange={(e) => setAdminAccessPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                      className={cn(inputClass, "h-12 text-center font-mono font-black text-2xl tracking-widest")}
+                    />
+                    <p className="text-[10px] text-gray-400 text-center">
+                      Setting this Access PIN will allow the administrator to authorize sensitive administrative actions securely.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setPinTargetAdmin(null)}
+                      className="py-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-2xl text-xs font-black uppercase cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingAdminPin || adminAccessPin.length !== 4}
+                      className="py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      {isSavingAdminPin ? <ButtonSpinner /> : "Save Access PIN"}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Edit Admin Modal */}
         {editingAdmin && (
@@ -538,25 +691,6 @@ function CpanelAdminsPageContent() {
                   <select
                     value={editingAdmin.role}
                     onChange={(e) => setEditingAdmin({ ...editingAdmin, role: e.target.value as any })}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-bold outline-none border cursor-pointer w-full", inputClass)}
-                  >
-                    <option value="super_admin">SUPER ADMIN</option>
-                    <option value="admin">ADMIN</option>
-                    <option value="finance">FINANCE</option>
-                    <option value="kyc_admin">KYC ADMIN</option>
-                    <option value="support">SUPPORT</option>
-                    <option value="read_only">READ ONLY</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Role</label>
-                  <select
-                    value={editingAdmin.role}
-                    onChange={(e) => {
-                      const selRole = e.target.value as AdminUserRecord["role"];
-                      setEditingAdmin({ ...editingAdmin, role: selRole });
-                    }}
                     className={cn("h-10 px-3 rounded-xl text-xs font-bold outline-none border cursor-pointer w-full", inputClass)}
                   >
                     <option value="super_admin">SUPER ADMIN</option>

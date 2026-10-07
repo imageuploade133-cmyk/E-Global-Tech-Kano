@@ -1,4 +1,4 @@
-export type TransactionLedgerStatus = "DEBITED" | "CREDITED" | "REVERSAL" | "PENDING" | "FAILED";
+export type TransactionLedgerStatus = "DEBITED" | "CREDITED" | "REVERSAL" | "PENDING" | "FAILED" | "HELD";
 
 export interface LedgerStatusResult {
   code: TransactionLedgerStatus;
@@ -70,7 +70,20 @@ export const getTransactionLedgerStatus = (tx?: {
     };
   }
 
-  // 2. PENDING
+  // 2. HELD SAFELY (Deposit limit or balance cap exceeded)
+  if (s === "HELD_LIMIT_EXCEEDED" || s === "HELD" || s === "HELD_SAFELY") {
+    return {
+      code: "HELD",
+      label: "Held Safely",
+      badgeBg: "bg-amber-50",
+      badgeText: "text-amber-700",
+      badgeBorder: "border-amber-200",
+      dotBg: "bg-amber-500",
+      icon: "lock_clock",
+    };
+  }
+
+  // 3. PENDING
   if (s === "PENDING" || s === "PROCESSING") {
     return {
       code: "PENDING",

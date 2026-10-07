@@ -36,10 +36,13 @@ function CpanelSettingsPageContent() {
   const [phone1Input, setPhone1Input] = useState(config.supportPhone1);
   const [phone2Input, setPhone2Input] = useState(config.supportPhone2);
   const [emailInput, setEmailInput] = useState(config.supportEmail);
-  const [apiKeyInput, setApiKeyInput] = useState(config.imgbbApiKey || "");
   const [uploadSizeInput, setUploadSizeInput] = useState(config.maxKycUploadSizeMb || 10);
   const [whatsappPollingEnabled, setWhatsappPollingEnabled] = useState(config.whatsappPollingEnabled !== false);
   const [whatsappPollingIntervalMinutes, setWhatsappPollingIntervalMinutes] = useState(config.whatsappPollingIntervalMinutes || 1);
+  const [imgbbApiKeyInput, setImgbbApiKeyInput] = useState(config.hasCustomImgbbApiKey ? "••••••••" : "");
+  const [hasCustomImgbbApiKey, setHasCustomImgbbApiKey] = useState(Boolean(config.hasCustomImgbbApiKey));
+  const [appVersionInput, setAppVersionInput] = useState(config.appVersion || "1.0.0");
+  const [appVersionPushEnabled, setAppVersionPushEnabled] = useState(config.appVersionPushNotificationEnabled !== false);
 
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -66,17 +69,33 @@ function CpanelSettingsPageContent() {
     setPhone1Input(config.supportPhone1);
     setPhone2Input(config.supportPhone2);
     setEmailInput(config.supportEmail);
-    setApiKeyInput(config.imgbbApiKey || "");
     setUploadSizeInput(config.maxKycUploadSizeMb || 10);
     setWhatsappPollingEnabled(config.whatsappPollingEnabled !== false);
     setWhatsappPollingIntervalMinutes(config.whatsappPollingIntervalMinutes || 1);
+    setHasCustomImgbbApiKey(Boolean(config.hasCustomImgbbApiKey));
+    setAppVersionInput(config.appVersion || "1.0.0");
+    setAppVersionPushEnabled(config.appVersionPushNotificationEnabled !== false);
+    if (config.hasCustomImgbbApiKey && !imgbbApiKeyInput) {
+      setImgbbApiKeyInput("••••••••");
+    }
   }, [config]);
+
+  const handleClearImgbbApiKey = async () => {
+    try {
+      await updateConfig({ imgbbApiKey: "", clearImgbbApiKey: true } as any);
+      setImgbbApiKeyInput("");
+      setHasCustomImgbbApiKey(false);
+      toast.success("Custom ImgBB API Key removed. System is now using default server environment key.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove custom ImgBB key.");
+    }
+  };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingBranding(true);
     try {
-      await updateConfig({
+      const payload: Record<string, any> = {
         logoUrl: logoInput,
         receiptLogoUrl: receiptLogoInput,
         receiptName: receiptNameInput,
@@ -89,12 +108,23 @@ function CpanelSettingsPageContent() {
         supportPhone1: phone1Input,
         supportPhone2: phone2Input,
         supportEmail: emailInput,
-        imgbbApiKey: apiKeyInput,
         maxKycUploadSizeMb: uploadSizeInput,
         whatsappPollingEnabled,
         whatsappPollingIntervalMinutes,
-      });
-      toast.success("Global branding, Statement logo, Signature, and Stamp settings applied!");
+        appVersion: appVersionInput.trim() || "1.0.0",
+        appVersionPushNotificationEnabled: appVersionPushEnabled,
+      };
+
+      if (imgbbApiKeyInput && imgbbApiKeyInput !== "••••••••") {
+        payload.imgbbApiKey = imgbbApiKeyInput;
+      }
+
+      await updateConfig(payload);
+      if (imgbbApiKeyInput && imgbbApiKeyInput !== "••••••••") {
+        setHasCustomImgbbApiKey(true);
+        setImgbbApiKeyInput("••••••••");
+      }
+      toast.success("Global branding, ImgBB API key, and system settings applied!");
     } catch (err: unknown) {
       console.error(err);
       toast.error("Failed to commit settings updates to system storage.");
@@ -323,17 +353,6 @@ function CpanelSettingsPageContent() {
             </h3>
             <form onSubmit={handleSaveSettings} className="space-y-4">
               <div className={cn("space-y-1 p-4 rounded-xl border transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
-                <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider">Imgbb API Key (Image Upload Rail)</label>
-                <input
-                  type="text"
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="Enter Imgbb v1 api key"
-                  className={inputClass}
-                />
-              </div>
-
-              <div className={cn("space-y-1 p-4 rounded-xl border transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
                 <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider">Max KYC Document Upload Size (MB)</label>
                 <input
                   type="number"
@@ -345,6 +364,130 @@ function CpanelSettingsPageContent() {
                   className={inputClass}
                 />
                 <p className="text-[9px] text-gray-400 mt-1">Configure the maximum permitted file size in MB for Identity document image uploads.</p>
+              </div>
+
+              {/* Platform App Version Release Controller */}
+              <div className={cn("p-4 rounded-xl border space-y-3 transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">system_update</span>
+                      Platform App Version Release & Deploy Update
+                    </label>
+                    <p className="text-[9px] text-gray-400 mt-0.5">
+                      Update or increment the system app version (e.g. 1.0.1, 1.0.2, 1.1.0) when deploying new platform updates. All connected clients will instantly receive a full-screen drawer modal prompting them to click &quot;UPDATE NOW&quot; to clear storage and load fresh system assets.
+                    </p>
+                  </div>
+                  <span className="font-mono px-2.5 py-1 bg-[#FC7A00]/10 border border-[#FC7A00]/30 text-[#FC7A00] rounded-xl text-[10px] font-black">
+                    LIVE: v{config.appVersion || "1.0.0"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Target Release Version</label>
+                    <input
+                      type="text"
+                      value={appVersionInput}
+                      onChange={(e) => setAppVersionInput(e.target.value)}
+                      placeholder="e.g. 1.0.1"
+                      className={cn(inputClass, "font-mono font-bold")}
+                    />
+                  </div>
+
+                  <div className="flex items-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const parts = appVersionInput.split(".");
+                        if (parts.length === 3 && !isNaN(Number(parts[2]))) {
+                          parts[2] = String(Number(parts[2]) + 1);
+                          setAppVersionInput(parts.join("."));
+                        } else {
+                          setAppVersionInput("1.0.1");
+                        }
+                      }}
+                      className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border border-emerald-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer h-10 flex items-center gap-1 shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                      <span>+ Increment Version</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Push Notification Toggle */}
+                <div className="flex items-center justify-between border-t border-gray-200/40 dark:border-gray-800 pt-2.5">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px] text-orange-500">notifications_active</span>
+                      Broadcast Version Release Push Notification
+                    </span>
+                    <p className="text-[8.5px] text-gray-400">Automatically send real-time push alerts to registered user devices when app version changes.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAppVersionPushEnabled(!appVersionPushEnabled)}
+                    className={cn(
+                      "px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer border transition-all shrink-0",
+                      appVersionPushEnabled
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                        : "bg-red-500/10 text-red-500 border-red-500/30"
+                    )}
+                  >
+                    {appVersionPushEnabled ? "PUSH ON" : "PUSH OFF"}
+                  </button>
+                </div>
+              </div>
+
+              {/* ImgBB Image Storage Gateway API Key Controls */}
+              <div className={cn("p-4 rounded-xl border space-y-3 transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">cloud_upload</span>
+                      ImgBB Image Storage Gateway API Key
+                    </label>
+                    <p className="text-[9px] text-gray-400 mt-0.5">
+                      Enter a custom ImgBB API key to override the server environment key. If left blank, the system will automatically use the key configured in server environment.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border",
+                        hasCustomImgbbApiKey
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                          : "bg-blue-500/10 text-blue-600 border-blue-500/30"
+                      )}
+                    >
+                      {hasCustomImgbbApiKey ? "CUSTOM KEY ACTIVE" : "SERVER ENV FALLBACK"}
+                    </span>
+                    {hasCustomImgbbApiKey && (
+                      <button
+                        type="button"
+                        onClick={handleClearImgbbApiKey}
+                        className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-600 border border-red-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                      >
+                        Remove Custom Key
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1 pt-1">
+                  <input
+                    type="password"
+                    value={imgbbApiKeyInput}
+                    onChange={(e) => setImgbbApiKeyInput(e.target.value)}
+                    placeholder={hasCustomImgbbApiKey ? "•••••••• (Enter new key to update)" : "Enter custom ImgBB API key"}
+                    className={inputClass}
+                  />
+                  <p className="text-[9px] text-gray-400">
+                    {hasCustomImgbbApiKey
+                      ? "A custom key is currently active. Type a new key to change it, or click 'Remove Custom Key' to use server env."
+                      : "Currently using server process.env.IMGBB_API_KEY. Enter a key above if you wish to override it."}
+                  </p>
+                </div>
               </div>
 
               {/* WhatsApp Automatic Connection Polling Controls */}

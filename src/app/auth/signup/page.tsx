@@ -62,6 +62,45 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [referralCode, setReferralCode] = useState("");
 
+  // Email Domain Typo Resolver & Vibration Feedback
+  const checkEmailTypo = (emailStr: string): string | null => {
+    if (!emailStr || !emailStr.includes("@")) return null;
+    const parts = emailStr.trim().toLowerCase().split("@");
+    if (parts.length !== 2) return null;
+
+    const [username, domain] = parts;
+    if (!domain) return null;
+
+    const gmailTypos = [
+      "gamil.com", "glmail.com", "gmaill.com", "gmail.co", "gmai.com",
+      "gmeil.com", "gmail.con", "gamil.co", "gmial.com", "gmal.com",
+      "gmai.co", "gmaill.co", "gamil.net", "gmai.net", "gmail.cm"
+    ];
+    const yahooTypos = [
+      "yahou.com", "yaho.com", "yahoo.co", "yaho.co", "yaho0.com",
+      "yaho.com.ng", "yaho.org", "yahoomail.co"
+    ];
+    const hotmailTypos = [
+      "hotmial.com", "hotmai.com", "hotmal.com", "hotmail.co", "hotmial.co"
+    ];
+    const outlookTypos = [
+      "outlok.com", "outlook.co", "outloook.com", "outlok.co"
+    ];
+    const icloudTypos = [
+      "icoud.com", "iclud.com", "icloud.co", "icloude.com"
+    ];
+
+    if (gmailTypos.includes(domain)) return `${username}@gmail.com`;
+    if (yahooTypos.includes(domain)) return `${username}@yahoo.com`;
+    if (hotmailTypos.includes(domain)) return `${username}@hotmail.com`;
+    if (outlookTypos.includes(domain)) return `${username}@outlook.com`;
+    if (icloudTypos.includes(domain)) return `${username}@icloud.com`;
+
+    return null;
+  };
+
+  const suggestedEmail = checkEmailTypo(email);
+
   // OTP Verification Channel Selector States ("whatsapp" | "email")
   const [otpChannel, setOtpChannel] = useState<"whatsapp" | "email">("whatsapp");
   const [isOtpRequested, setIsOtpRequested] = useState(false);
@@ -244,6 +283,8 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [showWeakPasswordModal, setShowWeakPasswordModal] = useState(false);
+  const [hasConfirmedWeakPassword, setHasConfirmedWeakPassword] = useState(false);
 
   // UI States
   const [showPassword, setShowPassword] = useState(false);
@@ -359,8 +400,17 @@ export default function SignUpPage() {
         return;
       }
 
+      const emailCorrection = checkEmailTypo(email);
+      if (emailCorrection && emailCorrection !== email) {
+        if (typeof window !== "undefined" && "vibrate" in navigator) {
+          try { navigator.vibrate([100, 50, 100]); } catch {}
+        }
+        toast.warning(`Typo detected in email! Did you mean ${emailCorrection}? Tap 'Fix Email' below.`);
+        return;
+      }
+
       if (!isOtpVerified) {
-        toast.error("Please verify your WhatsApp number with the OTP code first.");
+        toast.error("Please verify your contact with the OTP code first.");
         return;
       }
 
@@ -383,10 +433,8 @@ export default function SignUpPage() {
     e.preventDefault();
     setTermsError("");
 
-    // Step 4 final validations
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!password || !passwordRegex.test(password)) {
-      toast.error("Password must be at least 8 characters and include uppercase, lowercase, number, and a special character.");
+    if (!password || password.length < 6) {
+      toast.error("Password must be at least 6 characters.");
       return;
     }
 
@@ -398,6 +446,13 @@ export default function SignUpPage() {
     if (!acceptedTerms || !acceptedPrivacy) {
       setTermsError("You must accept both the Terms & Conditions and Privacy Policy.");
       toast.error("Please accept both the Terms and Privacy Policy.");
+      return;
+    }
+
+    // Check if password is weak (doesn't meet full strong requirements)
+    const isStrongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(password);
+    if (!isStrongPassword && !hasConfirmedWeakPassword) {
+      setShowWeakPasswordModal(true);
       return;
     }
 
@@ -547,7 +602,7 @@ export default function SignUpPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSignUp} className="space-y-6">
+        <form onSubmit={handleSignUp} className="space-y-6" autoComplete="on">
           <AnimatePresence mode="wait">
             {/* STEP 1: Personal Details */}
             {currentStep === 1 && (
@@ -647,14 +702,52 @@ export default function SignUpPage() {
                     <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
                       <input
                         id="email"
+                        name="email"
                         type="email"
+                        autoComplete="email"
                         required
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEmail(val);
+                          const typoFix = checkEmailTypo(val);
+                          if (typoFix && typoFix !== val) {
+                            if (typeof window !== "undefined" && "vibrate" in navigator) {
+                              try { navigator.vibrate([100, 50, 100]); } catch {}
+                            }
+                          }
+                        }}
                         className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
                         placeholder="doe@example.com"
                       />
                     </div>
+
+                    {/* Email Typo Notification & One-Tap Fix Banner */}
+                    {suggestedEmail && suggestedEmail !== email && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-amber-50 border border-amber-300 rounded-2xl p-3 flex items-center justify-between gap-2 shadow-xs mt-2"
+                      >
+                        <div className="flex items-center gap-2 text-amber-900 text-xs font-semibold">
+                          <span className="material-symbols-outlined text-amber-600 text-base animate-pulse">error_med</span>
+                          <span className="text-[11px]">
+                            Did you mean <strong className="font-mono text-black">{suggestedEmail}</strong>?
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEmail(suggestedEmail);
+                            toast.success(`Email updated to ${suggestedEmail}`);
+                          }}
+                          className="px-3 py-1.5 bg-[#FC7A00] hover:brightness-105 active:scale-95 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shrink-0 shadow-xs flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-xs">auto_fix</span>
+                          <span>Fix Email</span>
+                        </button>
+                      </motion.div>
+                    )}
                   </div>
                 </div>
 
@@ -913,7 +1006,9 @@ export default function SignUpPage() {
                     <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs relative">
                       <input
                         id="password"
+                        name="password"
                         type={showPassword ? "text" : "password"}
+                        autoComplete="new-password"
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -937,7 +1032,9 @@ export default function SignUpPage() {
                     <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs relative">
                       <input
                         id="confirmPassword"
+                        name="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
+                        autoComplete="new-password"
                         required
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -957,24 +1054,48 @@ export default function SignUpPage() {
                   </div>
                 </div>
 
-                {/* Password Strength Indicator */}
-                {password && (
-                  <div className="space-y-1.5 text-left bg-gray-50 p-3 rounded-2xl border border-gray-150">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-black uppercase text-gray-400">Password Strength</span>
-                      <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded text-white", pStrength.color)}>
-                        {pStrength.label}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-gray-250 rounded-full overflow-hidden">
-                      <div
-                        className={cn("h-full transition-all duration-300", pStrength.color)}
-                        style={{ width: `${(pStrength.score / 5) * 100}%` }}
-                      />
-                    </div>
-                    <p className="text-[8px] text-gray-400 font-semibold leading-tight">Must include at least 8 characters, an uppercase letter, a lowercase letter, a number, and a special character.</p>
+                {/* Password Strength Guidance & Requirement Checklist */}
+                <div className="space-y-3 text-left bg-gray-50 p-4 rounded-2xl border border-gray-200 shadow-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">Password Strength</span>
+                    <span className={cn("text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full text-white shadow-xs", pStrength.color)}>
+                      {pStrength.label}
+                    </span>
                   </div>
-                )}
+                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={cn("h-full transition-all duration-300 rounded-full", pStrength.color)}
+                      style={{ width: `${(pStrength.score / 5) * 100}%` }}
+                    />
+                  </div>
+
+                  {/* Interactive Requirement Checklist */}
+                  <div className="space-y-1.5 pt-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password Requirements</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] font-semibold">
+                      {[
+                        { label: "8+ characters", valid: password.length >= 8 },
+                        { label: "Uppercase letter (A-Z)", valid: /[A-Z]/.test(password) },
+                        { label: "Lowercase letter (a-z)", valid: /[a-z]/.test(password) },
+                        { label: "Numeric digit (0-9)", valid: /\d/.test(password) },
+                        { label: "Special character (@$!%*?&#)", valid: /[@$!%*?&]/.test(password) },
+                      ].map((req, rIdx) => (
+                        <div
+                          key={rIdx}
+                          className={cn(
+                            "flex items-center gap-1.5 transition-colors",
+                            req.valid ? "text-emerald-700 font-bold" : "text-gray-400"
+                          )}
+                        >
+                          <span className={cn("material-symbols-outlined text-[14px]", req.valid ? "text-emerald-600 font-bold" : "text-gray-300")}>
+                            {req.valid ? "check_circle" : "cancel"}
+                          </span>
+                          <span>{req.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
                 {/* Terms checkbox */}
                 <div className="space-y-3 text-left pt-2">
@@ -1193,6 +1314,70 @@ export default function SignUpPage() {
           </Link>
         </p>
       </motion.div>
+
+      {/* Weak Password Confirmation Modal */}
+      <AnimatePresence>
+        {showWeakPasswordModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[999999] flex items-center justify-center p-4 font-hanken"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 10 }}
+              className="bg-white rounded-3xl p-6 max-w-sm w-full text-center space-y-5 border border-gray-100 shadow-xl text-black"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-[#FC7A00] mx-auto">
+                <span className="material-symbols-outlined text-[32px]">shield_lock</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <h3 className="font-extrabold text-base text-gray-900 uppercase tracking-tight">Weak Password Warning</h3>
+                <p className="text-xs text-gray-600 leading-relaxed font-semibold">
+                  Your chosen password does not meet our recommended strong password guidelines (8+ characters with uppercase, lowercase, numbers, and symbols).
+                </p>
+              </div>
+
+              <div className="bg-amber-50/80 border border-amber-200 p-3.5 rounded-2xl text-left text-[11px] text-amber-900 font-semibold space-y-1">
+                <p className="font-bold flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm text-amber-600">info</span>
+                  Security Recommendation
+                </p>
+                <p>Using a weak password increases the risk of unauthorized access. Are you sure you want to proceed with this password?</p>
+              </div>
+
+              <div className="flex flex-col gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowWeakPasswordModal(false);
+                    setHasConfirmedWeakPassword(true);
+                    // Trigger signup again with confirmed weak password
+                    setTimeout(() => {
+                      const form = document.querySelector("form");
+                      if (form) form.requestSubmit();
+                    }, 50);
+                  }}
+                  className="w-full py-3.5 bg-[#FC7A00] hover:brightness-105 active:scale-98 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer transition-all shadow-sm"
+                >
+                  Agree & Continue with Weak Password
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowWeakPasswordModal(false)}
+                  className="w-full py-3 bg-gray-100 hover:bg-gray-200 active:scale-98 text-gray-700 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer transition-all"
+                >
+                  Improve Password
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -18,6 +18,7 @@ export function NotificationDetailModal({
   onClose,
   onCloseParentTray,
 }: NotificationDetailModalProps) {
+  const [fullImagePreview, setFullImagePreview] = React.useState<string | null>(null);
   useModalBackHandler(
     !!notification,
     onClose,
@@ -111,6 +112,19 @@ export function NotificationDetailModal({
             <p className="text-[11px] text-gray-400 font-mono font-medium">
               Received: {notification.time}
             </p>
+
+            {(notification.imageUrl || notification.bannerUrl) && (
+              <div
+                onClick={() => setFullImagePreview(notification.imageUrl || notification.bannerUrl || null)}
+                className="w-full mt-4 rounded-2xl overflow-hidden border border-gray-100 shadow-sm cursor-pointer hover:opacity-95 transition-opacity"
+              >
+                <img
+                  src={notification.imageUrl || notification.bannerUrl}
+                  alt="Notification Banner"
+                  className="w-full max-h-48 object-cover"
+                />
+              </div>
+            )}
           </div>
 
           {/* Conditional rendering based on Type */}
@@ -316,6 +330,33 @@ export function NotificationDetailModal({
                 <span className="material-symbols-outlined text-[16px]">shopping_bag</span>
                 <span>Open Store Orders</span>
               </Link>
+            ) : notification.url && notification.url !== "/" && notification.url !== "app" && notification.url !== "none" ? (
+              notification.url.startsWith("http://") || notification.url.startsWith("https://") ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onCloseParentTray();
+                    window.open(notification.url, "_blank", "noopener,noreferrer");
+                  }}
+                  className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-none text-center cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                  <span>Visit Web Link</span>
+                </button>
+              ) : (
+                <Link
+                  href={notification.url}
+                  onClick={() => {
+                    onClose();
+                    onCloseParentTray();
+                  }}
+                  className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-none text-center cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">open_in_browser</span>
+                  <span>Open Target Screen ({notification.url})</span>
+                </Link>
+              )
             ) : null}
 
             <button
@@ -327,6 +368,34 @@ export function NotificationDetailModal({
             </button>
           </div>
         </div>
+
+        {/* Full Image Zoom Modal */}
+        <AnimatePresence>
+          {fullImagePreview && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setFullImagePreview(null)}
+              className="fixed inset-0 z-[30000] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer"
+            >
+              <div className="relative max-w-lg w-full flex flex-col items-center">
+                <button
+                  type="button"
+                  onClick={() => setFullImagePreview(null)}
+                  className="absolute -top-12 right-0 w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-white/40 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px] font-bold">close</span>
+                </button>
+                <img
+                  src={fullImagePreview}
+                  alt="Full Banner Preview"
+                  className="w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border border-white/20"
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </AnimatePresence>
   );

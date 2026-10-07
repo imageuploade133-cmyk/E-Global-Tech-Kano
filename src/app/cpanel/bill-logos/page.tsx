@@ -59,7 +59,6 @@ function CpanelBillLogosPageContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("ALL");
-  const [imgbbApiKey, setImgbbApiKey] = useState("");
 
   // Track logo inputs per biller code
   const [logoMap, setLogoMap] = useState<Record<string, string>>({});
@@ -108,22 +107,6 @@ function CpanelBillLogosPageContent() {
     }
     checkSession();
   }, [router]);
-
-  // Fetch Admin Config for ImgBB Key
-  useEffect(() => {
-    async function fetchConfig() {
-      try {
-        const res = await fetch("/api/admin/config");
-        const data = await res.json();
-        if (data.config?.imgbbApiKey) {
-          setImgbbApiKey(data.config.imgbbApiKey);
-        }
-      } catch (err) {
-        console.warn("Failed to fetch admin config:", err);
-      }
-    }
-    fetchConfig();
-  }, []);
 
   // Fetch Bill Logos & Defaults
   const fetchBillLogos = async () => {

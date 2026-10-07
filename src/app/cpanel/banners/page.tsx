@@ -26,8 +26,9 @@ interface BannerSlide {
   imageUrl: string;
   title?: string;
   description?: string;
-  targetPage: "all" | "bills" | "investment" | "referral" | "transfer" | "estate";
+  targetPage: "all" | "bills" | "investment" | "referral" | "transfer" | "store" | "estate";
   link?: string;
+  position?: number;
   customWidth?: number | null;
   customHeight?: number | null;
   mobileHeight?: number | null;
@@ -68,8 +69,9 @@ function AdminBannersPageContent() {
   const [imageUrl, setImageUrl] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [targetPage, setTargetPage] = useState<"all" | "bills" | "investment" | "referral" | "transfer" | "estate">("all");
+  const [targetPage, setTargetPage] = useState<"all" | "bills" | "investment" | "referral" | "transfer" | "store" | "estate">("all");
   const [link, setLink] = useState("");
+  const [position, setPosition] = useState<number>(1);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -267,34 +269,20 @@ function AdminBannersPageContent() {
     if (!file || !editingSlide) return;
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("image", file);
-
-    const apiKey = config.imgbbApiKey || "";
-    if (!apiKey) {
-      toast.error("Imgbb API Key is missing. Please save an API key in visual branding settings.");
-      setIsUploading(false);
-      return;
-    }
-
-    toast.loading("Uploading slide image to ImgBB...");
+    toast.loading("Uploading slide image securely...");
     try {
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
-        method: "POST",
-        body: formData
-      });
-      const json = await res.json();
+      const result = await uploadImageSecurely(file, "banner");
       toast.dismiss();
 
-      if (json.success) {
-        setEditingSlide({ ...editingSlide, imageUrl: json.data.display_url });
+      if (result.success && result.url) {
+        setEditingSlide({ ...editingSlide, imageUrl: result.url });
         toast.success("Slide image changed successfully!");
       } else {
-        toast.error(json.error?.message || "Failed to upload image to ImgBB.");
+        toast.error(result.error || "Failed to upload slide image.");
       }
-    } catch {
+    } catch (err: any) {
       toast.dismiss();
-      toast.error("ImgBB API connection error.");
+      toast.error(err.message || "Slide image upload failed.");
     } finally {
       setIsUploading(false);
     }
@@ -326,7 +314,8 @@ function AdminBannersPageContent() {
           title: title.trim(),
           description: description.trim(),
           targetPage,
-          link: link.trim()
+          link: link.trim(),
+          position: Number(position) || 1
         })
       });
 
@@ -374,6 +363,7 @@ function AdminBannersPageContent() {
           description: editingSlide.description,
           targetPage: editingSlide.targetPage,
           link: editingSlide.link,
+          position: Number(editingSlide.position) || 1,
           customWidth: editingSlide.customWidth,
           customHeight: editingSlide.customHeight,
           mobileHeight: editingSlide.mobileHeight,
@@ -427,6 +417,54 @@ function AdminBannersPageContent() {
       }
     } catch {
       toast.error("API connection error while deleting banner.");
+    }
+  };
+
+  const handleQuickMovePosition = async (slide: BannerSlide, delta: number) => {
+    const currentPos = slide.position || 1;
+    const newPos = Math.max(1, currentPos + delta);
+    if (newPos === currentPos) return;
+
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/banners", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          id: slide.id,
+          imageUrl: slide.imageUrl,
+          title: slide.title,
+          description: slide.description,
+          targetPage: slide.targetPage,
+          link: slide.link,
+          position: newPos,
+          customWidth: slide.customWidth,
+          customHeight: slide.customHeight,
+          mobileHeight: slide.mobileHeight,
+          desktopHeight: slide.desktopHeight,
+          marginBottom: slide.marginBottom,
+          isCrop: slide.isCrop,
+          isHidden: slide.isHidden,
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Slide moved to position #${newPos}`);
+        fetchBanners();
+      } else {
+        toast.error(data.error || "Failed to update position.");
+      }
+    } catch {
+      toast.error("Network error updating slide position.");
     }
   };
 
@@ -552,6 +590,26 @@ function AdminBannersPageContent() {
                   onChange={(e) => setBannerSlideInterval(Math.max(1, parseInt(e.target.value) || 1))}
                   className={inputClass}
                 />
+              </div>
+
+              {/* Position / Slide Order Input */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">format_list_numbered</span>
+                  Slide Position / Order Number (1, 2, 3...)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  placeholder="e.g. 1"
+                  value={position}
+                  onChange={(e) => setPosition(Math.max(1, parseInt(e.target.value) || 1))}
+                  className={cn(inputClass, "font-mono font-bold")}
+                />
+                <p className="text-[9px] text-gray-400 font-semibold leading-relaxed">
+                  Lower position numbers (e.g. 1, 2) display first in the public slideshow.
+                </p>
               </div>
 
               {/* Border Toggle */}
@@ -825,6 +883,7 @@ function AdminBannersPageContent() {
                   <option value="investment">Investment Page</option>
                   <option value="referral">Referral Page</option>
                   <option value="transfer">Secure Transfer Drawer</option>
+                  <option value="store">Public Store Page</option>
                   <option value="estate">E-Global Estate Page</option>
                 </select>
               </div>
@@ -901,14 +960,38 @@ function AdminBannersPageContent() {
                       <div className="min-w-0 flex-1">
                         <h4 className="font-extrabold text-xs uppercase tracking-tight text-orange-500 leading-tight select-all truncate">{b.title || "Untitled Slide"}</h4>
                         <p className={cn("text-[10px] font-medium leading-relaxed truncate mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>{b.description || "No text description."}</p>
-                        <div className="flex flex-wrap gap-2 mt-2">
+                        <div className="flex flex-wrap gap-2 mt-2 items-center">
+                          <div className="flex items-center gap-1">
+                            <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400">
+                              Position #{b.position || 1}
+                            </span>
+                            <button
+                              type="button"
+                              title="Move Up"
+                              onClick={() => handleQuickMovePosition(b, -1)}
+                              disabled={(b.position || 1) <= 1}
+                              className="w-5 h-5 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-orange-500/10 hover:text-orange-500 text-gray-500 disabled:opacity-30 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[12px] font-bold">arrow_upward</span>
+                            </button>
+                            <button
+                              type="button"
+                              title="Move Down"
+                              onClick={() => handleQuickMovePosition(b, 1)}
+                              className="w-5 h-5 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-orange-500/10 hover:text-orange-500 text-gray-500 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[12px] font-bold">arrow_downward</span>
+                            </button>
+                          </div>
                           <span className={cn(
                             "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border",
                             b.targetPage === "all" && "bg-orange-500/10 border-orange-500/20 text-[#FC7A00]",
                             b.targetPage === "bills" && "bg-indigo-500/10 border-indigo-500/20 text-indigo-500",
                             b.targetPage === "investment" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
                             b.targetPage === "referral" && "bg-teal-500/10 border-teal-500/20 text-teal-500",
-                            b.targetPage === "transfer" && "bg-blue-500/10 border-blue-500/20 text-blue-500"
+                            b.targetPage === "transfer" && "bg-blue-500/10 border-blue-500/20 text-blue-500",
+                            b.targetPage === "store" && "bg-purple-500/10 border-purple-500/20 text-purple-500",
+                            b.targetPage === "estate" && "bg-rose-500/10 border-rose-500/20 text-rose-500"
                           )}>
                             Page: {b.targetPage}
                           </span>
@@ -1060,6 +1143,7 @@ function AdminBannersPageContent() {
                       <option value="investment">Investment</option>
                       <option value="referral">Referral</option>
                       <option value="transfer">Transfer</option>
+                      <option value="store">Public Store Page</option>
                       <option value="estate">Estate Marketplace</option>
                     </select>
                   </div>
@@ -1075,14 +1159,30 @@ function AdminBannersPageContent() {
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Action Link</label>
-                  <input
-                    type="text"
-                    value={editingSlide.link || ""}
-                    onChange={(e) => setEditingSlide({ ...editingSlide, link: e.target.value })}
-                    className={inputClass}
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Action Link</label>
+                    <input
+                      type="text"
+                      value={editingSlide.link || ""}
+                      onChange={(e) => setEditingSlide({ ...editingSlide, link: e.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[13px]">format_list_numbered</span>
+                      Position Order (#)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={editingSlide.position || 1}
+                      onChange={(e) => setEditingSlide({ ...editingSlide, position: Math.max(1, parseInt(e.target.value) || 1) })}
+                      className={cn(inputClass, "font-mono font-bold")}
+                    />
+                  </div>
                 </div>
 
                 {/* Dedicated Per-Slide Height Customization (Mobile & Desktop) */}
