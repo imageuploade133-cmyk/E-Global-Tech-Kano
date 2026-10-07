@@ -614,23 +614,23 @@ function CpanelKycPageContent() {
                             onClick: () => handleProcessKyc(u.uid, "reject"),
                           },
                           {
-                            label: "Delete Unverified User",
+                            label: "Delete User",
                             icon: "delete_forever",
                             variant: "danger",
-                            disabled: u.kycStatus !== "UNVERIFIED",
+                            disabled: u.kycStatus !== "UNVERIFIED" && u.kycStatus !== "REJECTED",
                             onClick: () => handleDeleteUnverifiedUser(u.uid, u.name),
                           },
                         ]}
                       />
 
-                      {u.kycStatus === "UNVERIFIED" && (
+                      {(u.kycStatus === "UNVERIFIED" || u.kycStatus === "REJECTED") && (
                         <button
                           type="button"
                           onClick={() => handleDeleteUnverifiedUser(u.uid, u.name)}
                           className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
                         >
                           <span className="material-symbols-outlined text-[16px]">delete_forever</span>
-                          <span>Delete Unverified User</span>
+                          <span>Delete {u.kycStatus === "REJECTED" ? "Rejected" : "Unverified"} User</span>
                         </button>
                       )}
                     </div>
@@ -767,7 +767,7 @@ function CpanelKycPageContent() {
             </div>
 
             <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-200/50 dark:border-gray-800 flex-wrap">
-              {inspectingUser.kycStatus === "UNVERIFIED" ? (
+              {inspectingUser.kycStatus === "UNVERIFIED" || inspectingUser.kycStatus === "REJECTED" ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -778,7 +778,7 @@ function CpanelKycPageContent() {
                   className="px-4 py-2 bg-rose-600 text-white text-xs font-extrabold uppercase rounded-xl hover:bg-rose-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
                 >
                   <span className="material-symbols-outlined text-[18px]">delete_forever</span>
-                  <span>Delete Unverified User</span>
+                  <span>Delete {inspectingUser.kycStatus === "REJECTED" ? "Rejected" : "Unverified"} User</span>
                 </button>
               ) : (
                 <div />
