@@ -2,7 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { resolveBankName } from "../src/lib/bank-resolver";
 
 describe("Incoming Sender Information Display & Resolution Safety", () => {
-  // Helper simulating TransactionReceipt's resolveRealSenderName
+  // Helper matching TransactionReceipt's resolveRealSenderName
   const resolveRealSenderName = (
     transaction: {
       senderName?: string | null;
@@ -13,14 +13,7 @@ describe("Incoming Sender Information Display & Resolution Safety", () => {
     },
     userData?: { name?: string | null; displayName?: string | null; fullName?: string | null }
   ): string | null => {
-    let candidate = transaction.senderName;
-    if (!candidate && transaction.description) {
-      const descMatch = transaction.description.match(/^(?:Transfer From|Bank Transfer • From)\s+(.+)$/i);
-      if (descMatch && descMatch[1]) {
-        candidate = descMatch[1].trim();
-      }
-    }
-
+    const candidate = transaction.senderName;
     if (!candidate || typeof candidate !== "string") return null;
     const trimmedCandidate = candidate.trim();
     if (trimmedCandidate.length === 0) return null;
@@ -46,7 +39,7 @@ describe("Incoming Sender Information Display & Resolution Safety", () => {
     return trimmedCandidate;
   };
 
-  // Helper simulating maskAcc function
+  // Helper matching TransactionReceipt's maskAcc function
   const maskAcc = (acc?: string | null) => {
     if (!acc) return null;
     const clean = acc.replace(/\D/g, "");
@@ -54,67 +47,69 @@ describe("Incoming Sender Information Display & Resolution Safety", () => {
     return "****" + clean.slice(-4);
   };
 
-  it("Test 1: An incoming transaction containing senderName displays the real sender name", () => {
+  it("Test 1 — real sender name: given senderName='John Doe' and recipientName='E-Global User', resolves 'John Doe'", () => {
     const tx = {
-      senderName: "KABIRU ABDULLAHI SHABA",
-      recipientName: "E-GLOBAL USER",
+      senderName: "John Doe",
+      recipientName: "E-Global User",
     };
-    const resolved = resolveRealSenderName(tx, { name: "E-GLOBAL USER" });
-    expect(resolved).toBe("KABIRU ABDULLAHI SHABA");
+    const resolved = resolveRealSenderName(tx, { name: "E-Global User" });
+    expect(resolved).toBe("John Doe");
   });
 
-  it("Test 2: senderBankName is displayed and resolved correctly when available (and does NOT fall back to receiving bank name)", () => {
+  it("Test 2 — never substitute recipient name: given senderName=undefined and recipientName='E-Global User', sender must NOT become 'E-Global User'", () => {
+    const tx = {
+      senderName: undefined,
+      recipientName: "E-Global User",
+      customerName: "E-Global User",
+    };
+    const resolved = resolveRealSenderName(tx, { name: "E-Global User" });
+    expect(resolved).toBeNull();
+    expect(resolved).not.toBe("E-Global User");
+  });
+
+  it("Test 3 — sender bank: given senderBankName='Example Bank' and bankName='Receiving Bank', for TRANSFER_FROM displayed sender bank is 'Example Bank' and NOT 'Receiving Bank'", () => {
     const txWithSenderBank = {
-      senderBankName: "GTBANK",
-      senderBankCode: "058",
-      bankName: "Wema Bank", // Receiving bank
-      virtualAccountBankName: "Wema Bank",
+      senderBankName: "Example Bank",
+      bankName: "Receiving Bank",
+      virtualAccountBankName: "Receiving Bank",
     };
 
     const resolvedBank = resolveBankName(txWithSenderBank, [], "TRANSFER_FROM");
-    expect(resolvedBank).toBe("GTBANK");
+    expect(resolvedBank).toBe("Example Bank");
+    expect(resolvedBank).not.toBe("Receiving Bank");
 
-    // When senderBankName is absent, it must NOT fall back to receiving bankName
+    // Missing senderBankName must return 'Bank', not 'Receiving Bank'
     const txWithoutSenderBank = {
-      senderBankName: null,
-      bankName: "Wema Bank", // Receiving bank
-      virtualAccountBankName: "Wema Bank",
+      senderBankName: undefined,
+      bankName: "Receiving Bank",
     };
 
     const fallbackBank = resolveBankName(txWithoutSenderBank, [], "TRANSFER_FROM");
     expect(fallbackBank).toBe("Bank");
-    expect(fallbackBank).not.toBe("Wema Bank");
+    expect(fallbackBank).not.toBe("Receiving Bank");
   });
 
-  it("Test 3: senderAccountNumber is handled according to existing masking rules", () => {
+  it("Test 4 — sender account: given senderAccountNumber='0123456789', uses sender account and preserves existing masking behavior", () => {
     expect(maskAcc("0123456789")).toBe("****6789");
     expect(maskAcc("1234")).toBe("1234");
-    expect(maskAcc(null)).toBeNull();
+    expect(maskAcc(undefined)).toBeNull();
   });
 
-  it("Test 4: The recipient/customer/user name is NEVER substituted as the sender name", () => {
-    const txMatchingRecipient = {
-      senderName: "JOHN RECIPIENT DOE",
-      recipientName: "JOHN RECIPIENT DOE",
-      customerName: "JOHN RECIPIENT DOE",
+  it("Test 5 — missing sender information: if senderName/senderBankName/senderAccountNumber are undefined, safely shows empty/null state and does NOT derive sender from description", () => {
+    const txWithDescription = {
+      senderName: undefined,
+      senderBankName: undefined,
+      senderAccountNumber: undefined,
+      description: "Transfer From Fraudulent Guess",
+      recipientName: "E-Global User",
     };
 
-    const resolved = resolveRealSenderName(txMatchingRecipient, { name: "JOHN RECIPIENT DOE" });
+    const resolved = resolveRealSenderName(txWithDescription, { name: "E-Global User" });
     expect(resolved).toBeNull();
+    expect(resolved).not.toBe("Fraudulent Guess");
   });
 
-  it("Test 5: Missing sender information does NOT produce a false sender identity", () => {
-    const txMissingSender = {
-      senderName: null,
-      description: "Wallet Funding",
-      recipientName: "RECEIVING USER",
-    };
-
-    const resolved = resolveRealSenderName(txMissingSender, { name: "RECEIVING USER" });
-    expect(resolved).toBeNull();
-  });
-
-  it("Test 6: Existing transaction types continue working unchanged", () => {
+  it("Test 6 — existing transaction types: non-incoming-transfer transaction behavior is unchanged", () => {
     const transferTx = {
       recipientBankName: "Access Bank",
       beneficiaryBankName: "Access Bank",

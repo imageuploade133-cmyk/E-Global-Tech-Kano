@@ -1603,14 +1603,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   const maskedVirtualAccount = maskVirt(transaction.virtualAccountNumber);
 
                   const resolveRealSenderName = (): string | null => {
-                    let candidate = transaction.senderName;
-                    if (!candidate && transaction.description) {
-                      const descMatch = transaction.description.match(/^(?:Transfer From|Bank Transfer • From)\s+(.+)$/i);
-                      if (descMatch && descMatch[1]) {
-                        candidate = descMatch[1].trim();
-                      }
-                    }
-
+                    const candidate = transaction.senderName;
                     if (!candidate || typeof candidate !== "string") return null;
                     const trimmedCandidate = candidate.trim();
                     if (trimmedCandidate.length === 0) return null;
