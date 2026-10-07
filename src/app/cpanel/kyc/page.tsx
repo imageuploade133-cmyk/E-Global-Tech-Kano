@@ -51,11 +51,18 @@ function CpanelKycPageContent() {
   const [kycHasMore, setKycHasMore] = useState(false);
   const [kycTotalCount, setKycTotalCount] = useState(0);
 
+  // Dynamic Tier Levels state
+  const [tierOptions, setTierOptions] = useState<{ id: string; name: string; dailyLimit: number; singleLimit: number; maxBalance: number }[]>([
+    { id: "tier_1", name: "Tier 1", dailyLimit: 500000, singleLimit: 200000, maxBalance: 300000 },
+    { id: "tier_2", name: "Tier 2", dailyLimit: 5000000, singleLimit: 2000000, maxBalance: 5000000 },
+    { id: "tier_3", name: "Tier 3", dailyLimit: 50000000, singleLimit: 10000000, maxBalance: 50000000 },
+  ]);
+
   // Inspector, Editor & Approval Drawer States
   const [inspectingUser, setInspectingUser] = useState<PendingKycUser | null>(null);
   const [editingUser, setEditingUser] = useState<PendingKycUser | null>(null);
   const [approvingKycUser, setApprovingKycUser] = useState<PendingKycUser | null>(null);
-  const [approveTier, setApproveTier] = useState<"Tier 1" | "Tier 2" | "Tier 3">("Tier 2");
+  const [approveTier, setApproveTier] = useState<string>("Tier 2");
   const [approveProvider, setApproveProvider] = useState<"flutterwave" | "squad">("flutterwave");
   const [approveDailyLimit, setApproveDailyLimit] = useState<number>(5000000);
   const [approveSingleLimit, setApproveSingleLimit] = useState<number>(2000000);
@@ -207,7 +214,20 @@ function CpanelKycPageContent() {
 
   useEffect(() => {
     fetchPendingKyc(false, kycTab);
+    fetchTierLevels();
   }, [kycTab]);
+
+  const fetchTierLevels = async () => {
+    try {
+      const res = await fetch("/api/admin/tier-levels");
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.tierLevels) && data.tierLevels.length > 0) {
+        setTierOptions(data.tierLevels);
+      }
+    } catch {
+      // Ignore background tier level fetch errors
+    }
+  };
 
   const handleKycApproveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -966,24 +986,21 @@ function CpanelKycPageContent() {
                 <select
                   value={approveTier}
                   onChange={(e) => {
-                    const val = e.target.value as any;
+                    const val = e.target.value;
                     setApproveTier(val);
-                    if (val === "Tier 3") {
-                      setApproveDailyLimit(50000000);
-                      setApproveSingleLimit(10000000);
-                    } else if (val === "Tier 2") {
-                      setApproveDailyLimit(5000000);
-                      setApproveSingleLimit(2000000);
-                    } else {
-                      setApproveDailyLimit(500000);
-                      setApproveSingleLimit(200000);
+                    const matched = tierOptions.find((t) => t.name === val || t.id === val);
+                    if (matched) {
+                      setApproveDailyLimit(matched.dailyLimit);
+                      setApproveSingleLimit(matched.singleLimit);
                     }
                   }}
                   className={cn(inputClass, "cursor-pointer font-bold")}
                 >
-                  <option value="Tier 1">Tier 1 (₦500,000 / Day)</option>
-                  <option value="Tier 2">Tier 2 (₦5,000,000 / Day)</option>
-                  <option value="Tier 3">Tier 3 (₦50,000,000 / Day)</option>
+                  {tierOptions.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} (₦{t.dailyLimit.toLocaleString("en-NG")} / Day)
+                    </option>
+                  ))}
                 </select>
               </div>
 

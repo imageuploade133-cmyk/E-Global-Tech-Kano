@@ -46,6 +46,13 @@ function SetLimitsPageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Dynamic Tier Options state
+  const [tierOptions, setTierOptions] = useState<{ id: string; name: string; dailyLimit: number; singleLimit: number; maxBalance: number }[]>([
+    { id: "tier_1", name: "Tier 1", dailyLimit: 500000, singleLimit: 200000, maxBalance: 300000 },
+    { id: "tier_2", name: "Tier 2", dailyLimit: 5000000, singleLimit: 2000000, maxBalance: 5000000 },
+    { id: "tier_3", name: "Tier 3", dailyLimit: 50000000, singleLimit: 10000000, maxBalance: 50000000 },
+  ]);
+
   // Approve KYC Modal Drawer state
   const [isApproveKycModalOpen, setIsApproveKycModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,7 +61,7 @@ function SetLimitsPageContent() {
   const [selectedUser, setSelectedUser] = useState<SearchedUser | null>(null);
 
   const [approveProvider, setApproveProvider] = useState<"flutterwave" | "squad">("flutterwave");
-  const [approveTier, setApproveTier] = useState<"Tier 1" | "Tier 2" | "Tier 3">("Tier 2");
+  const [approveTier, setApproveTier] = useState<string>("Tier 2");
   const [approveUserBalance, setApproveUserBalance] = useState<number>(0);
   const [approveMaxBalance, setApproveMaxBalance] = useState<number>(5000000);
   const [approveDailyLimit, setApproveDailyLimit] = useState<number>(5000000);
@@ -82,6 +89,7 @@ function SetLimitsPageContent() {
 
   useEffect(() => {
     fetchLimits();
+    fetchTierLevels();
   }, []);
 
   const fetchLimits = async () => {
@@ -99,6 +107,18 @@ function SetLimitsPageContent() {
       toast.error("Failed to load global default tier limits.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchTierLevels = async () => {
+    try {
+      const res = await fetch("/api/admin/tier-levels");
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.tierLevels) && data.tierLevels.length > 0) {
+        setTierOptions(data.tierLevels);
+      }
+    } catch {
+      // Ignore background tier levels fetch errors
     }
   };
 
@@ -125,20 +145,27 @@ function SetLimitsPageContent() {
     }
   };
 
-  const handleSelectTierForUser = (tier: "Tier 1" | "Tier 2" | "Tier 3") => {
-    setApproveTier(tier);
-    if (tier === "Tier 3") {
-      setApproveMaxBalance(limits.tier3MaxBalance || 50000000);
-      setApproveDailyLimit(limits.tier3DailyTransferLimit || 50000000);
-      setApproveSingleLimit(limits.tier3SingleTransferLimit || 10000000);
-    } else if (tier === "Tier 2") {
-      setApproveMaxBalance(limits.tier2MaxBalance || 5000000);
-      setApproveDailyLimit(limits.tier2DailyTransferLimit || 5000000);
-      setApproveSingleLimit(limits.tier2SingleTransferLimit || 2000000);
+  const handleSelectTierForUser = (tierName: string) => {
+    setApproveTier(tierName);
+    const matched = tierOptions.find((t) => t.name === tierName || t.id === tierName);
+    if (matched) {
+      setApproveMaxBalance(matched.maxBalance);
+      setApproveDailyLimit(matched.dailyLimit);
+      setApproveSingleLimit(matched.singleLimit);
     } else {
-      setApproveMaxBalance(limits.tier1MaxBalance || 300000);
-      setApproveDailyLimit(limits.tier1DailyTransferLimit || 500000);
-      setApproveSingleLimit(limits.tier1SingleTransferLimit || 200000);
+      if (tierName === "Tier 3") {
+        setApproveMaxBalance(limits.tier3MaxBalance || 50000000);
+        setApproveDailyLimit(limits.tier3DailyTransferLimit || 50000000);
+        setApproveSingleLimit(limits.tier3SingleTransferLimit || 10000000);
+      } else if (tierName === "Tier 2") {
+        setApproveMaxBalance(limits.tier2MaxBalance || 5000000);
+        setApproveDailyLimit(limits.tier2DailyTransferLimit || 5000000);
+        setApproveSingleLimit(limits.tier2SingleTransferLimit || 2000000);
+      } else {
+        setApproveMaxBalance(limits.tier1MaxBalance || 300000);
+        setApproveDailyLimit(limits.tier1DailyDepositLimit || 500000);
+        setApproveSingleLimit(limits.tier1SingleTransferLimit || 200000);
+      }
     }
   };
 
@@ -387,12 +414,14 @@ function SetLimitsPageContent() {
                   <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">ASSIGN TIER LEVEL *</label>
                   <select
                     value={approveTier}
-                    onChange={(e) => handleSelectTierForUser(e.target.value as any)}
+                    onChange={(e) => handleSelectTierForUser(e.target.value)}
                     className={cn(inputClass, "cursor-pointer font-bold")}
                   >
-                    <option value="Tier 1">Tier 1 (Basic Tier)</option>
-                    <option value="Tier 2">Tier 2 (Verified Tier)</option>
-                    <option value="Tier 3">Tier 3 (Premium Tier)</option>
+                    {tierOptions.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name} (Max Balance: ₦{t.maxBalance.toLocaleString("en-NG")})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -864,12 +893,14 @@ function SetLimitsPageContent() {
                     <label className="text-[10px] font-extrabold uppercase text-gray-400">Assign Tier Level *</label>
                     <select
                       value={approveTier}
-                      onChange={(e) => handleSelectTierForUser(e.target.value as any)}
+                      onChange={(e) => handleSelectTierForUser(e.target.value)}
                       className={cn(inputClass, "cursor-pointer font-bold")}
                     >
-                      <option value="Tier 1">Tier 1 (Basic Tier)</option>
-                      <option value="Tier 2">Tier 2 (Verified Tier)</option>
-                      <option value="Tier 3">Tier 3 (Premium Tier)</option>
+                      {tierOptions.map((t) => (
+                        <option key={t.id} value={t.name}>
+                          {t.name} (₦{t.dailyLimit.toLocaleString("en-NG")} / Day)
+                        </option>
+                      ))}
                     </select>
                   </div>
 

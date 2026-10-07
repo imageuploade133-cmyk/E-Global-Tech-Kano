@@ -403,6 +403,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
         { id: "kyc", label: "KYC Approvals", icon: "verified_user", href: "/cpanel/kyc", badge: sidebarCounts["kyc"], permission: "kyc.view" },
         { id: "limit_requests", label: "Limit Requests", icon: "manage_accounts", href: "/cpanel/limit-requests", badge: sidebarCounts["limit_requests"], permission: "users.manage" },
         { id: "freeze", label: "Account Freeze", icon: "ac_unit", href: "/cpanel/freeze", permission: "freeze.manage" },
+        { id: "tier_levels", label: "Assign Tier Levels", icon: "workspace_premium", href: "/cpanel/tier-levels", permission: "limits.manage" },
         { id: "set_limits", label: "Set Limits", icon: "tune", href: "/cpanel/set-limits", permission: "limits.manage" },
         { id: "limits", label: "Global Transfer Limits", icon: "trending_up", href: "/cpanel/limits", permission: "limits.manage" },
       ]
