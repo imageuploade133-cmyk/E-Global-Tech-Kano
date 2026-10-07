@@ -8,6 +8,7 @@ import Image from "next/image";
 import { useLogos } from "@/lib/logos-client";
 import { BankLogoResolver } from "@/components/wallet/BankLogoResolver";
 import { useAppConfig } from "@/lib/ConfigContext";
+import { useAuth } from "@/lib/AuthContext";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { resolveBankName } from "@/lib/bank-resolver";
 import { getTransactionLedgerStatus } from "@/lib/transaction-status-normalizer";
@@ -119,6 +120,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const { getBillerLogo, getBankLogo, getStoreLogo, banks } = useLogos();
   const { config } = useAppConfig();
+  const { userData } = useAuth();
 
   useModalBackHandler(Boolean(transaction), onClose, "transaction-receipt-modal");
 
@@ -1600,12 +1602,46 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   const maskedSenderAccount = maskAcc(transaction.senderAccountNumber);
                   const maskedVirtualAccount = maskVirt(transaction.virtualAccountNumber);
 
+                  const resolveRealSenderName = (): string | null => {
+                    let candidate = transaction.senderName;
+                    if (!candidate && transaction.description) {
+                      const descMatch = transaction.description.match(/^(?:Transfer From|Bank Transfer • From)\s+(.+)$/i);
+                      if (descMatch && descMatch[1]) {
+                        candidate = descMatch[1].trim();
+                      }
+                    }
+
+                    if (!candidate || typeof candidate !== "string") return null;
+                    const trimmedCandidate = candidate.trim();
+                    if (trimmedCandidate.length === 0) return null;
+
+                    const isInvalidRecipientMatch = (invalidName?: string | null) => {
+                      if (!invalidName || typeof invalidName !== "string") return false;
+                      const normInvalid = invalidName.trim().toLowerCase();
+                      const normCand = trimmedCandidate.toLowerCase();
+                      return normInvalid.length > 0 && normCand === normInvalid;
+                    };
+
+                    if (
+                      isInvalidRecipientMatch(transaction.recipientName) ||
+                      isInvalidRecipientMatch(transaction.customerName) ||
+                      isInvalidRecipientMatch(transaction.beneficiaryName) ||
+                      isInvalidRecipientMatch(userData?.name) ||
+                      isInvalidRecipientMatch((userData as any)?.displayName) ||
+                      isInvalidRecipientMatch((userData as any)?.fullName)
+                    ) {
+                      return null;
+                    }
+
+                    return trimmedCandidate;
+                  };
+
+                  const displaySenderName = resolveRealSenderName();
+
                   const resolvedSenderBank = resolveBankName(
                     {
                       senderBankName: transaction.senderBankName,
                       senderBankCode: transaction.senderBankCode,
-                      bankName: transaction.senderBankName,
-                      bankCode: transaction.senderBankCode,
                     },
                     banks,
                     "TRANSFER_FROM"
@@ -1637,10 +1673,10 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         <span className="text-black font-bold">Bank Transfer</span>
                       </div>
 
-                      {transaction.senderName && (
+                      {displaySenderName && (
                         <div className="flex justify-between items-start text-gray-500 font-semibold">
                           <span>From</span>
-                          <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">{transaction.senderName}</span>
+                          <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">{displaySenderName}</span>
                         </div>
                       )}
 
