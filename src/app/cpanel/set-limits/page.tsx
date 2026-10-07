@@ -32,10 +32,41 @@ function ButtonSpinner() {
   );
 }
 
+interface SearchedUser {
+  uid: string;
+  name: string;
+  email: string;
+  phoneNumber: string;
+  role: string;
+  balance?: number;
+}
+
 function SetLimitsPageContent() {
   const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Dynamic Tier Options state
+  const [tierOptions, setTierOptions] = useState<{ id: string; name: string; dailyLimit: number; singleLimit: number; maxBalance: number }[]>([
+    { id: "tier_1", name: "Tier 1", dailyLimit: 500000, singleLimit: 200000, maxBalance: 300000 },
+    { id: "tier_2", name: "Tier 2", dailyLimit: 5000000, singleLimit: 2000000, maxBalance: 5000000 },
+    { id: "tier_3", name: "Tier 3", dailyLimit: 50000000, singleLimit: 10000000, maxBalance: 50000000 },
+  ]);
+
+  // Approve KYC Modal Drawer state
+  const [isApproveKycModalOpen, setIsApproveKycModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchedUser[]>([]);
+  const [selectedUser, setSelectedUser] = useState<SearchedUser | null>(null);
+
+  const [approveProvider, setApproveProvider] = useState<"flutterwave" | "squad">("flutterwave");
+  const [approveTier, setApproveTier] = useState<string>("Tier 2");
+  const [approveUserBalance, setApproveUserBalance] = useState<number>(0);
+  const [approveMaxBalance, setApproveMaxBalance] = useState<number>(5000000);
+  const [approveDailyLimit, setApproveDailyLimit] = useState<number>(5000000);
+  const [approveSingleLimit, setApproveSingleLimit] = useState<number>(2000000);
+  const [isApprovingKyc, setIsApprovingKyc] = useState(false);
 
   const [limits, setLimits] = useState<TierLimitState>({
     tier1MaxBalance: 300000,
@@ -58,6 +89,7 @@ function SetLimitsPageContent() {
 
   useEffect(() => {
     fetchLimits();
+    fetchTierLevels();
   }, []);
 
   const fetchLimits = async () => {
@@ -75,6 +107,116 @@ function SetLimitsPageContent() {
       toast.error("Failed to load global default tier limits.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchTierLevels = async () => {
+    try {
+      const res = await fetch("/api/admin/tier-levels");
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.tierLevels) && data.tierLevels.length > 0) {
+        setTierOptions(data.tierLevels);
+      }
+    } catch {
+      // Ignore background tier levels fetch errors
+    }
+  };
+
+  const handleSearchUsers = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setIsSearchingUsers(true);
+    try {
+      const res = await fetch(`/api/admin/users?search=${encodeURIComponent(searchQuery.trim())}`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSearchResults(data.users || []);
+        if ((data.users || []).length === 0) {
+          toast.error("No users found matching your search term.");
+        }
+      } else {
+        toast.error(data.error || "Failed to search user accounts.");
+      }
+    } catch {
+      toast.error("Network communication error searching users.");
+    } finally {
+      setIsSearchingUsers(false);
+    }
+  };
+
+  const handleSelectTierForUser = (tierName: string) => {
+    setApproveTier(tierName);
+    const matched = tierOptions.find((t) => t.name === tierName || t.id === tierName);
+    if (matched) {
+      setApproveMaxBalance(matched.maxBalance);
+      setApproveDailyLimit(matched.dailyLimit);
+      setApproveSingleLimit(matched.singleLimit);
+    } else {
+      if (tierName === "Tier 3") {
+        setApproveMaxBalance(limits.tier3MaxBalance || 50000000);
+        setApproveDailyLimit(limits.tier3DailyTransferLimit || 50000000);
+        setApproveSingleLimit(limits.tier3SingleTransferLimit || 10000000);
+      } else if (tierName === "Tier 2") {
+        setApproveMaxBalance(limits.tier2MaxBalance || 5000000);
+        setApproveDailyLimit(limits.tier2DailyTransferLimit || 5000000);
+        setApproveSingleLimit(limits.tier2SingleTransferLimit || 2000000);
+      } else {
+        setApproveMaxBalance(limits.tier1MaxBalance || 300000);
+        setApproveDailyLimit(limits.tier1DailyDepositLimit || 500000);
+        setApproveSingleLimit(limits.tier1SingleTransferLimit || 200000);
+      }
+    }
+  };
+
+  const handleSelectUserAccount = (u: SearchedUser) => {
+    setSelectedUser(u);
+    setApproveUserBalance(Number(u.balance) || 0);
+  };
+
+  const handleApproveKycAndLimits = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) {
+      toast.error("Please search and select a target user first.");
+      return;
+    }
+
+    setIsApprovingKyc(true);
+    toast.loading(`Approving KYC & setting limits for ${selectedUser.name}...`);
+
+    try {
+      const res = await fetch("/api/admin/kyc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "approve",
+          targetUid: selectedUser.uid,
+          provider: approveProvider,
+          tier: approveTier,
+          balance: approveUserBalance,
+          dailyLimit: approveDailyLimit,
+          singleLimit: approveSingleLimit,
+          maxBalance: approveMaxBalance,
+        }),
+      });
+
+      toast.dismiss();
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast.success(data.message || `KYC approved & limits updated for ${selectedUser.name}!`);
+        setIsApproveKycModalOpen(false);
+        setSelectedUser(null);
+        setSearchQuery("");
+        setSearchResults([]);
+      } else {
+        toast.error(data.error || "Failed to approve KYC and set user limits.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Network communication failure approving KYC.");
+    } finally {
+      setIsApprovingKyc(false);
     }
   };
 
@@ -152,7 +294,16 @@ function SetLimitsPageContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsApproveKycModalOpen(true)}
+              className="px-4 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[18px]">verified</span>
+              <span>Approve KYC &amp; Set User Limits</span>
+            </button>
+
             <button
               type="button"
               onClick={toggleTheme}
@@ -161,6 +312,7 @@ function SetLimitsPageContent() {
               <span className="material-symbols-outlined text-[18px]">{isDark ? "light_mode" : "dark_mode"}</span>
               <span className="hidden sm:inline">{isDark ? "Light Mode" : "Dark Mode"}</span>
             </button>
+
             <Link
               href="/cpanel/limits"
               className="px-4 h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5"
@@ -169,6 +321,193 @@ function SetLimitsPageContent() {
               <span>Account Limits Manager</span>
             </Link>
           </div>
+        </div>
+
+        {/* Dedicated Section: APPROVE KYC & SET LIMITS Workspace */}
+        <div className={cn("p-6 rounded-2xl border space-y-5", panelClass)}>
+          <div className="flex items-center justify-between border-b pb-3 border-gray-200/40 dark:border-gray-800 flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-emerald-500 text-[24px]">verified</span>
+              <div>
+                <h2 className="font-extrabold text-base uppercase tracking-tight">APPROVE KYC &amp; SET LIMITS</h2>
+                <p className="text-xs text-gray-400 font-medium">Search customer account, assign Tier level, set wallet available balance, and configure transfer limits.</p>
+              </div>
+            </div>
+            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-black uppercase rounded-full">
+              Quick Manager
+            </span>
+          </div>
+
+          {!selectedUser ? (
+            <div className="space-y-4 text-xs">
+              <form onSubmit={handleSearchUsers} className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Search Customer Account *</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by Full Name, Email, Phone, or BVN..."
+                    className={inputClass}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSearchingUsers}
+                    className="px-5 h-11 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    {isSearchingUsers ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">search</span>}
+                    <span>Search</span>
+                  </button>
+                </div>
+              </form>
+
+              {searchResults.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Matching Accounts ({searchResults.length})</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
+                    {searchResults.map((u) => (
+                      <div
+                        key={u.uid}
+                        onClick={() => handleSelectUserAccount(u)}
+                        className={cn(
+                          "p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all hover:border-emerald-500",
+                          isDark ? "bg-gray-800/80 border-gray-700 hover:bg-gray-800" : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                        )}
+                      >
+                        <div>
+                          <p className="font-extrabold text-sm uppercase text-gray-900 dark:text-white">{u.name}</p>
+                          <p className="font-mono text-[11px] text-gray-400">{u.email} • {u.phoneNumber}</p>
+                          <p className="text-[10px] font-bold text-emerald-500 mt-0.5">Balance: ₦{(u.balance || 0).toLocaleString("en-NG")}</p>
+                        </div>
+                        <button
+                          type="button"
+                          className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-xl"
+                        >
+                          Select
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <form onSubmit={handleApproveKycAndLimits} className="space-y-4 text-xs">
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-emerald-500">Selected Customer</span>
+                  <p className="font-extrabold text-base text-gray-900 dark:text-white">{selectedUser.name}</p>
+                  <p className="font-mono text-xs text-gray-400">{selectedUser.email} • {selectedUser.phoneNumber}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedUser(null)}
+                  className="px-3 py-1.5 text-xs font-black uppercase tracking-wider text-rose-500 border border-rose-500/30 rounded-xl hover:bg-rose-500/10 cursor-pointer"
+                >
+                  Change User
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">ASSIGN TIER LEVEL *</label>
+                  <select
+                    value={approveTier}
+                    onChange={(e) => handleSelectTierForUser(e.target.value)}
+                    className={cn(inputClass, "cursor-pointer font-bold")}
+                  >
+                    {tierOptions.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name} (Max Balance: ₦{t.maxBalance.toLocaleString("en-NG")})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Virtual Account Gateway Rail *</label>
+                  <select
+                    value={approveProvider}
+                    onChange={(e) => setApproveProvider(e.target.value as any)}
+                    className={cn(inputClass, "cursor-pointer font-bold")}
+                  >
+                    <option value="flutterwave">Flutterwave Gateway Rail</option>
+                    <option value="squad">Squadco (GTBank) Virtual Account Rail</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">User Available Balance (₦) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={approveUserBalance}
+                    onChange={(e) => setApproveUserBalance(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Maximum Tier Balance Cap (₦)</label>
+                  <input
+                    type="number"
+                    required
+                    min={100000}
+                    value={approveMaxBalance}
+                    onChange={(e) => setApproveMaxBalance(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Daily Transfer Limit (₦)</label>
+                  <input
+                    type="number"
+                    required
+                    min={100000}
+                    value={approveDailyLimit}
+                    onChange={(e) => setApproveDailyLimit(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Single Transfer Limit (₦)</label>
+                  <input
+                    type="number"
+                    required
+                    min={50000}
+                    value={approveSingleLimit}
+                    onChange={(e) => setApproveSingleLimit(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUser(null)}
+                  disabled={isApprovingKyc}
+                  className="px-4 py-2.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isApprovingKyc}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isApprovingKyc && <ButtonSpinner />}
+                  <span>Approve KYC &amp; Set Limits</span>
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         <form onSubmit={handleSaveLimits} className="space-y-6">
@@ -441,6 +780,205 @@ function SetLimitsPageContent() {
         </form>
 
       </div>
+
+      {/* Approve KYC & Set Custom User Limits Modal Drawer */}
+      {isApproveKycModalOpen && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+          <div className={cn("w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto no-scrollbar", panelClass)}>
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-emerald-500 text-[26px]">verified</span>
+                <div>
+                  <h3 className="text-base font-extrabold uppercase">Approve KYC &amp; Set User Limits</h3>
+                  <p className="text-[10px] text-gray-400">Search customer, assign Tier, virtual account rail &amp; custom limits.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsApproveKycModalOpen(false);
+                  setSelectedUser(null);
+                }}
+                className="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+
+            {/* Step 1: Search and Select User */}
+            {!selectedUser ? (
+              <div className="space-y-4 text-xs">
+                <form onSubmit={handleSearchUsers} className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Search Customer Account *</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search by Full Name, Email, Phone, or BVN..."
+                      className={inputClass}
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSearchingUsers}
+                      className="px-5 h-11 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                    >
+                      {isSearchingUsers ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">search</span>}
+                      <span>Search</span>
+                    </button>
+                  </div>
+                </form>
+
+                {searchResults.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Matching Customer Accounts ({searchResults.length})</label>
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {searchResults.map((u) => (
+                        <div
+                          key={u.uid}
+                          onClick={() => setSelectedUser(u)}
+                          className={cn(
+                            "p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all hover:border-emerald-500",
+                            isDark ? "bg-gray-800/80 border-gray-700 hover:bg-gray-800" : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                          )}
+                        >
+                          <div>
+                            <p className="font-extrabold text-sm uppercase text-gray-900 dark:text-white">{u.name}</p>
+                            <p className="font-mono text-[11px] text-gray-400">{u.email} • {u.phoneNumber}</p>
+                          </div>
+                          <button
+                            type="button"
+                            className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-xl"
+                          >
+                            Select
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Step 2: Configure KYC Approval & Limits */
+              <form onSubmit={handleApproveKycAndLimits} className="space-y-4 text-xs">
+                <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-emerald-500">Selected Customer</span>
+                    <p className="font-extrabold text-sm text-gray-900 dark:text-white">{selectedUser.name}</p>
+                    <p className="font-mono text-[11px] text-gray-400">{selectedUser.email} • {selectedUser.phoneNumber}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUser(null)}
+                    className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-rose-500 border border-rose-500/30 rounded-lg hover:bg-rose-500/10 cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold uppercase text-gray-400">Virtual Account Gateway Provider *</label>
+                  <select
+                    value={approveProvider}
+                    onChange={(e) => setApproveProvider(e.target.value as any)}
+                    className={cn(inputClass, "cursor-pointer font-bold")}
+                  >
+                    <option value="flutterwave">Flutterwave Gateway Rail</option>
+                    <option value="squad">Squadco (GTBank) Virtual Account Rail</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-extrabold uppercase text-gray-400">Assign Tier Level *</label>
+                    <select
+                      value={approveTier}
+                      onChange={(e) => handleSelectTierForUser(e.target.value)}
+                      className={cn(inputClass, "cursor-pointer font-bold")}
+                    >
+                      {tierOptions.map((t) => (
+                        <option key={t.id} value={t.name}>
+                          {t.name} (₦{t.dailyLimit.toLocaleString("en-NG")} / Day)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-extrabold uppercase text-gray-400">User Available Balance (₦) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      value={approveUserBalance}
+                      onChange={(e) => setApproveUserBalance(Number(e.target.value))}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold uppercase text-gray-400">Maximum Tier Balance Cap (₦)</label>
+                  <input
+                    type="number"
+                    required
+                    min={100000}
+                    value={approveMaxBalance}
+                    onChange={(e) => setApproveMaxBalance(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold uppercase text-gray-400">Daily Transfer Limit (₦)</label>
+                  <input
+                    type="number"
+                    required
+                    min={100000}
+                    value={approveDailyLimit}
+                    onChange={(e) => setApproveDailyLimit(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold uppercase text-gray-400">Single Transfer Limit (₦)</label>
+                  <input
+                    type="number"
+                    required
+                    min={50000}
+                    value={approveSingleLimit}
+                    onChange={(e) => setApproveSingleLimit(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-gray-200/50 dark:border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsApproveKycModalOpen(false);
+                      setSelectedUser(null);
+                    }}
+                    disabled={isApprovingKyc}
+                    className="px-4 py-2.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isApprovingKyc}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {isApprovingKyc && <ButtonSpinner />}
+                    <span>Approve KYC &amp; Set Limits</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
