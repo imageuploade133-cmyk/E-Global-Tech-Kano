@@ -84,7 +84,7 @@ async function autoReleaseUserHeldDeposits(userId: string, adminEmail: string) {
   }
 }
 
-async function resolveTierLimits(assignedTier: string, customDaily?: number, customSingle?: number) {
+async function resolveTierLimits(assignedTier: string, customDaily?: number, customSingle?: number, customMaxBalance?: number) {
   let appData: Record<string, any> = {};
   try {
     const appDoc = await adminDb.collection("config").doc("app").get();
@@ -97,28 +97,35 @@ async function resolveTierLimits(assignedTier: string, customDaily?: number, cus
 
   let defaultDaily = 500000;
   let defaultSingle = 200000;
+  let defaultMaxBalance = 300000;
 
   if (assignedTier === "Tier 3") {
     defaultDaily = Number(appData.tier3DailyTransferLimit ?? appData.tier3DailyLimit ?? 50000000);
     defaultSingle = Number(appData.tier3SingleTransferLimit ?? appData.tier3SingleLimit ?? 10000000);
+    defaultMaxBalance = Number(appData.tier3MaxBalance ?? 50000000);
   } else if (assignedTier === "Tier 2") {
     defaultDaily = Number(appData.tier2DailyTransferLimit ?? appData.tier2DailyLimit ?? 5000000);
     defaultSingle = Number(appData.tier2SingleTransferLimit ?? appData.tier2SingleLimit ?? 2000000);
+    defaultMaxBalance = Number(appData.tier2MaxBalance ?? 5000000);
   } else {
     defaultDaily = Number(appData.tier1DailyTransferLimit ?? appData.tier1DailyLimit ?? 500000);
     defaultSingle = Number(appData.tier1SingleTransferLimit ?? appData.tier1SingleLimit ?? 200000);
+    defaultMaxBalance = Number(appData.tier1MaxBalance ?? 300000);
   }
 
   const hasCustomDaily = typeof customDaily === "number" && customDaily > 0 && customDaily !== defaultDaily;
   const hasCustomSingle = typeof customSingle === "number" && customSingle > 0 && customSingle !== defaultSingle;
-  const isCustom = hasCustomDaily || hasCustomSingle;
+  const hasCustomMaxBalance = typeof customMaxBalance === "number" && customMaxBalance > 0 && customMaxBalance !== defaultMaxBalance;
+  const isCustom = hasCustomDaily || hasCustomSingle || hasCustomMaxBalance;
 
   const finalDaily = typeof customDaily === "number" && customDaily > 0 ? customDaily : defaultDaily;
   const finalSingle = typeof customSingle === "number" && customSingle > 0 ? customSingle : defaultSingle;
+  const finalMaxBalance = typeof customMaxBalance === "number" && customMaxBalance > 0 ? customMaxBalance : defaultMaxBalance;
 
   return {
     dailyLimit: finalDaily,
     singleLimit: finalSingle,
+    maxBalance: finalMaxBalance,
     hasCustomLimits: isCustom,
   };
 }
@@ -380,8 +387,9 @@ export async function POST(req: Request) {
       const assignedTier = requestBody.tier || "Tier 2";
       const customDaily = requestBody.dailyLimit !== undefined && requestBody.dailyLimit !== null && requestBody.dailyLimit !== "" ? Number(requestBody.dailyLimit) : undefined;
       const customSingle = requestBody.singleLimit !== undefined && requestBody.singleLimit !== null && requestBody.singleLimit !== "" ? Number(requestBody.singleLimit) : undefined;
+      const customMaxBalance = requestBody.maxBalance !== undefined && requestBody.maxBalance !== null && requestBody.maxBalance !== "" ? Number(requestBody.maxBalance) : undefined;
 
-      const limits = await resolveTierLimits(assignedTier, customDaily, customSingle);
+      const limits = await resolveTierLimits(assignedTier, customDaily, customSingle, customMaxBalance);
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -408,6 +416,8 @@ export async function POST(req: Request) {
         dailyTransferLimit: limits.dailyLimit,
         singleLimit: limits.singleLimit,
         maxSingleTransferLimit: limits.singleLimit,
+        maxBalance: limits.maxBalance,
+        maxAccountBalance: limits.maxBalance,
         hasCustomLimits: limits.hasCustomLimits,
         kycStatus: "VERIFIED",
         kycVerifiedAt: new Date().toISOString(),
@@ -423,6 +433,8 @@ export async function POST(req: Request) {
         dailyTransferLimit: limits.dailyLimit,
         singleLimit: limits.singleLimit,
         maxSingleTransferLimit: limits.singleLimit,
+        maxBalance: limits.maxBalance,
+        maxAccountBalance: limits.maxBalance,
         hasCustomLimits: limits.hasCustomLimits,
         updatedAt: new Date().toISOString(),
       }, { merge: true });
