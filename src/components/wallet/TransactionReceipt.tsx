@@ -1599,7 +1599,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   }
 
                   // Default: Dynamic Virtual Account / Bank Transfer
-                  const maskedSenderAccount = maskAcc(transaction.senderAccountNumber);
+                  const displaySenderAccount = transaction.senderAccountNumber ? String(transaction.senderAccountNumber).trim() : null;
                   const maskedVirtualAccount = maskVirt(transaction.virtualAccountNumber);
 
                   const resolveRealSenderName = (): string | null => {
@@ -1666,10 +1666,10 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         </div>
                       </div>
 
-                      {maskedSenderAccount && (
+                      {displaySenderAccount && (
                         <div className="flex justify-between items-center text-gray-500 font-semibold">
                           <span>Sender Account</span>
-                          <span className="font-mono text-black font-bold">{maskedSenderAccount}</span>
+                          <span className="font-mono text-black font-bold">{displaySenderAccount}</span>
                         </div>
                       )}
 

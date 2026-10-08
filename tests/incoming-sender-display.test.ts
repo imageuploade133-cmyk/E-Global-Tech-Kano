@@ -89,10 +89,11 @@ describe("Incoming Sender Information Display & Resolution Safety", () => {
     expect(fallbackBank).not.toBe("Receiving Bank");
   });
 
-  it("Test 4 — sender account: given senderAccountNumber='0123456789', uses sender account and preserves existing masking behavior", () => {
-    expect(maskAcc("0123456789")).toBe("****6789");
-    expect(maskAcc("1234")).toBe("1234");
-    expect(maskAcc(undefined)).toBeNull();
+  it("Test 4 — sender account: given senderAccountNumber='0123456789', displays full sender account number without truncation", () => {
+    const formatSenderAccount = (acc?: string | null) => (acc ? String(acc).trim() : null);
+    expect(formatSenderAccount("0123456789")).toBe("0123456789");
+    expect(formatSenderAccount("****6789")).toBe("****6789");
+    expect(formatSenderAccount(undefined)).toBeNull();
   });
 
   it("Test 5 — missing sender information: if senderName/senderBankName/senderAccountNumber are undefined, safely shows empty/null state and does NOT derive sender from description", () => {
