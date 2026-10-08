@@ -1607,25 +1607,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     if (!candidate || typeof candidate !== "string") return null;
                     const trimmedCandidate = candidate.trim();
                     if (trimmedCandidate.length === 0) return null;
-
-                    const isInvalidRecipientMatch = (invalidName?: string | null) => {
-                      if (!invalidName || typeof invalidName !== "string") return false;
-                      const normInvalid = invalidName.trim().toLowerCase();
-                      const normCand = trimmedCandidate.toLowerCase();
-                      return normInvalid.length > 0 && normCand === normInvalid;
-                    };
-
-                    if (
-                      isInvalidRecipientMatch(transaction.recipientName) ||
-                      isInvalidRecipientMatch(transaction.customerName) ||
-                      isInvalidRecipientMatch(transaction.beneficiaryName) ||
-                      isInvalidRecipientMatch(userData?.name) ||
-                      isInvalidRecipientMatch((userData as any)?.displayName) ||
-                      isInvalidRecipientMatch((userData as any)?.fullName)
-                    ) {
-                      return null;
-                    }
-
                     return trimmedCandidate;
                   };
 
@@ -1652,7 +1633,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
                   const displayReceivingBank = resolvedReceivingBank !== "Bank"
                     ? resolvedReceivingBank
-                    : (transaction.virtualAccountBankName || "Wema Bank");
+                    : (transaction.virtualAccountBankName || "Bank information unavailable");
 
                   const meta = (transaction.metadata || {}) as Record<string, any>;
                   const autoInflowFee = Number(meta.autoInflowFee) || (feeAmt > 0 ? feeAmt : 0);
@@ -1681,7 +1662,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                             bankCode={transaction.senderBankCode}
                             className="w-5 h-5 shrink-0"
                           />
-                          <span className="text-black font-bold">{resolvedSenderBank}</span>
+                          <span className="text-black font-bold">{resolvedSenderBank !== "Bank" ? resolvedSenderBank : "Bank information unavailable"}</span>
                         </div>
                       </div>
 
