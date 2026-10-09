@@ -567,11 +567,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   };
 
   const onCloneReceiptForHtml2Canvas = (clonedDoc: Document) => {
-    // 1. Remove external link stylesheets that may contain unsupported color syntax like oklab/oklch
-    const linkStyles = clonedDoc.querySelectorAll("link[rel='stylesheet']");
-    linkStyles.forEach((link) => link.remove());
-
-    // 2. Sanitize all inline <style> blocks
+    // 1. Retain <link rel="stylesheet"> so Tailwind layout and styles are preserved!
+    // Sanitize all inline <style> blocks
     const styleElements = clonedDoc.querySelectorAll("style");
     styleElements.forEach((style) => {
       try {
@@ -586,25 +583,32 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
       }
     });
 
-    // 3. Strip any CSS rules containing oklab/oklch from clonedDoc.styleSheets
+    // 2. Sanitize rules in clonedDoc.styleSheets without deleting whole rules or removing stylesheet links
     try {
       Array.from(clonedDoc.styleSheets).forEach((sheet) => {
         try {
           const rules = Array.from(sheet.cssRules || []);
-          for (let i = rules.length - 1; i >= 0; i--) {
-            if (rules[i].cssText && /(oklab|oklch|lab|lch|color)\(/i.test(rules[i].cssText)) {
+          rules.forEach((rule) => {
+            if (rule.cssText && /(oklab|oklch|lab|lch|color)\(/i.test(rule.cssText)) {
               try {
-                sheet.deleteRule(i);
+                // If it's a style rule, replace unsupported color expressions in its style declaration
+                const styleRule = rule as CSSStyleRule;
+                if (styleRule.style) {
+                  const cssText = styleRule.style.cssText;
+                  if (cssText) {
+                    styleRule.style.cssText = sanitizeCssString(cssText);
+                  }
+                }
               } catch (err) {}
             }
-          }
+          });
         } catch (e) {
           // Cross-origin or restricted stylesheet
         }
       });
     } catch (e) {}
 
-    // 4. Sanitize element inline styles and computed unsupported color properties
+    // 3. Convert computed element styles to explicit inline styles for unsupported color syntax
     const UNSUPPORTED_PATTERN = /(oklab|oklch|lab|lch|color)\(/i;
     const clonedElements = clonedDoc.querySelectorAll("*");
 
