@@ -478,10 +478,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   let senderBankAndAcc = "";
   let txTypeDisplay = "";
 
+  const userFullName = String((userData as any)?.fullName || (userData as any)?.name || "");
+
   if (isDeposit) {
     txTypeDisplay = "Bank Deposit";
 
-    recipientNameDisplay = userData?.fullName || userData?.name || transaction.recipientName || "E-Global User";
+    recipientNameDisplay = userFullName || transaction.recipientName || "E-Global User";
     const recBank = displayReceivingBank !== "Bank" ? displayReceivingBank : (config.appName || "E-Global Pay");
     const recAcc = maskAccountNum(transaction.virtualAccountNumber || userData?.virtualAccountNumber);
     recipientBankAndAcc = recAcc ? `${recBank} | ${recAcc}` : recBank;
@@ -498,7 +500,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     const recAcc = maskAccountNum(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber);
     recipientBankAndAcc = recAcc ? `${recBank} | ${recAcc}` : recBank;
 
-    senderNameDisplay = userData?.fullName || userData?.name || transaction.senderName || config.appName || "E-Global Pay User";
+    senderNameDisplay = userFullName || transaction.senderName || config.appName || "E-Global Pay User";
     const sendBank = config.appName || "E-Global Pay";
     const sendAcc = maskAccountNum(userData?.virtualAccountNumber || userData?.accountNumber || transaction.senderAccountNumber);
     senderBankAndAcc = sendAcc ? `${sendBank} | ${sendAcc}` : sendBank;
@@ -510,7 +512,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     const maskedTarget = maskAccountNum(targetNum);
     recipientBankAndAcc = maskedTarget ? `${recipientNameDisplay} | ${maskedTarget}` : recipientNameDisplay;
 
-    senderNameDisplay = userData?.fullName || userData?.name || config.appName || "E-Global Pay User";
+    senderNameDisplay = userFullName || config.appName || "E-Global Pay User";
     const sendAcc = maskAccountNum(userData?.virtualAccountNumber || userData?.accountNumber);
     senderBankAndAcc = sendAcc ? `${config.appName || "E-Global Pay"} | ${sendAcc}` : (config.appName || "E-Global Pay");
   } else if (isStore) {
@@ -519,7 +521,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     recipientNameDisplay = transaction.billerName || config.appName || "E-Global Store";
     recipientBankAndAcc = `${config.appName || "E-Global Store"} | Store Order`;
 
-    senderNameDisplay = userData?.fullName || userData?.name || "E-Global Customer";
+    senderNameDisplay = userFullName || "E-Global Customer";
     const sendAcc = maskAccountNum(userData?.virtualAccountNumber || userData?.accountNumber);
     senderBankAndAcc = sendAcc ? `${config.appName || "E-Global Pay"} | ${sendAcc}` : (config.appName || "E-Global Pay");
   } else if (isSwap) {
@@ -528,12 +530,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     recipientNameDisplay = `${transaction.destinationCurrency || "USD"} Wallet`;
     recipientBankAndAcc = `Currency Exchange`;
 
-    senderNameDisplay = userData?.fullName || userData?.name || "E-Global Customer";
+    senderNameDisplay = userFullName || "E-Global Customer";
     senderBankAndAcc = `${transaction.sourceCurrency || "NGN"} Wallet`;
   } else if (isRefund) {
     txTypeDisplay = "Transaction Reversal";
 
-    recipientNameDisplay = userData?.fullName || userData?.name || "E-Global User";
+    recipientNameDisplay = userFullName || "E-Global User";
     const recAcc = maskAccountNum(userData?.virtualAccountNumber || userData?.accountNumber);
     recipientBankAndAcc = recAcc ? `${config.appName || "E-Global Pay"} | ${recAcc}` : (config.appName || "E-Global Pay");
 
@@ -545,7 +547,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     recipientNameDisplay = transaction.recipientName || transaction.beneficiaryName || "Recipient";
     recipientBankAndAcc = resolvedTransferToBank !== "Bank" ? resolvedTransferToBank : (config.appName || "E-Global Pay");
 
-    senderNameDisplay = userData?.fullName || userData?.name || "Sender";
+    senderNameDisplay = userFullName || "Sender";
     senderBankAndAcc = config.appName || "E-Global Pay";
   }
 
