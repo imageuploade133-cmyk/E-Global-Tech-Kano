@@ -278,7 +278,7 @@ export async function POST(req: Request) {
         category: "TRANSFER",
         direction: "DEBIT",
         description,
-        narration: userNarration,
+        narration: userNarration || undefined,
         recipientName: trfName,
         fee: combinedFee,
         vat: 0,
