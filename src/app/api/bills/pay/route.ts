@@ -527,9 +527,24 @@ export async function POST(req: Request) {
 
       // Rollback totalChargeAmount (base bill + markup) atomically
       await adminDb.runTransaction(async (transaction) => {
+        // 1. ALL READS: Execute all transaction.get() reads first
         const userDoc = await transaction.get(userRef);
+        const walletRef = adminDb.collection("wallets").doc(`${uid}_NGN`);
+        const walletDoc = await transaction.get(walletRef);
+
         if (userDoc.exists) {
-          // Update the original transaction document to FAILED
+          const preLoadedUser = {
+            ref: userRef,
+            data: userDoc.data() || {},
+            balance: Number(userDoc.data()?.balance) || 0,
+          };
+          const preLoadedWallet = {
+            ref: walletRef,
+            data: walletDoc.exists ? walletDoc.data() || {} : {},
+            balance: walletDoc.exists ? Number(walletDoc.data()?.balance) || 0 : 0,
+          };
+
+          // 2. ALL WRITES: Execute all updates sequentially
           const origTxRef = adminDb.collection("transactions").doc(`tx-${reference}`);
           transaction.update(origTxRef, { status: "FAILED" });
 
@@ -543,6 +558,8 @@ export async function POST(req: Request) {
             walletType: walletType || "MAIN",
             type: "REFUND",
             category: (biller_type || "BILLS").toUpperCase(),
+            preLoadedUser,
+            preLoadedWallet,
             metadata: {
               billerCode: item_code || biller_code || "",
               billerName: biller_name || biller_code || "",
