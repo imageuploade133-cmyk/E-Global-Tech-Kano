@@ -555,36 +555,51 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const formattedDateTime = formatTransactionDateTime(transaction.createdAt, transaction.date, transaction.time).dateTime;
   const statusText = ledgerStatus.label === "Credited" || ledgerStatus.label === "Debited" ? "Successful" : ledgerStatus.label;
 
-  // Canvas Sanitization for html2canvas
+  // Canvas Sanitization for html2canvas (converts Tailwind v4 oklab, oklch, lab, lch color functions to safe fallbacks)
+  const sanitizeCssString = (css: string): string => {
+    if (!css) return "";
+    return css
+      .replace(/oklab\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
+      .replace(/oklch\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
+      .replace(/lab\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
+      .replace(/lch\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
+      .replace(/color\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)");
+  };
+
   const onCloneReceiptForHtml2Canvas = (clonedDoc: Document) => {
     const styles = clonedDoc.querySelectorAll("style, link[rel='stylesheet']");
     styles.forEach((style) => {
       try {
-        if (style.textContent && style.textContent.includes("oklch")) {
-          style.textContent = style.textContent.replace(/oklch\([^)]+\)/gi, "rgba(0,0,0,0.1)");
+        if (style.textContent) {
+          style.textContent = sanitizeCssString(style.textContent);
         }
       } catch (e) {
         // Ignore CSS parsing issues in cloned document
       }
     });
 
+    const UNSUPPORTED_PATTERN = /(oklab|oklch|lab|lch|color)\(/i;
     const clonedElements = clonedDoc.querySelectorAll("*");
+
     clonedElements.forEach((el) => {
       const htmlEl = el as HTMLElement;
-      if (!htmlEl.style) return;
+
+      if (htmlEl.hasAttribute("style")) {
+        const rawStyle = htmlEl.getAttribute("style");
+        if (rawStyle) {
+          htmlEl.setAttribute("style", sanitizeCssString(rawStyle));
+        }
+      }
 
       try {
         const computed = window.getComputedStyle(htmlEl);
-        const bg = computed.backgroundColor;
-        if (bg && bg.includes("oklch")) {
-          htmlEl.style.backgroundColor = "#FFFFFF";
+        if (UNSUPPORTED_PATTERN.test(computed.backgroundColor)) {
+          htmlEl.style.backgroundColor = "transparent";
         }
-        const color = computed.color;
-        if (color && color.includes("oklch")) {
+        if (UNSUPPORTED_PATTERN.test(computed.color)) {
           htmlEl.style.color = "#000000";
         }
-        const border = computed.borderColor;
-        if (border && border.includes("oklch")) {
+        if (UNSUPPORTED_PATTERN.test(computed.borderColor)) {
           htmlEl.style.borderColor = "#E2E8F0";
         }
       } catch (e) {
