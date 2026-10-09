@@ -54,6 +54,11 @@ export function useModalBackHandler(
     // 3. Handle PopState (Back Button Interception)
     const handlePopState = (event: PopStateEvent) => {
       if (isProgrammaticBack) {
+        isProgrammaticBack = false;
+        if (programmaticBackTimer) {
+          clearTimeout(programmaticBackTimer);
+          programmaticBackTimer = null;
+        }
         return;
       }
 
