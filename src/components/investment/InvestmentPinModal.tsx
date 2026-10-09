@@ -113,7 +113,7 @@ export function InvestmentPinModal({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100000] flex items-end justify-center bg-black/60 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[200000] flex items-end justify-center bg-black/60 backdrop-blur-sm">
         <div className="absolute inset-0" onClick={() => !isSubmitting && onClose()} />
 
         <motion.div
