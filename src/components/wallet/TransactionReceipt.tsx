@@ -352,6 +352,26 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
   const resolvedMobileNumber = resolveAirtimePhoneNumber(transaction);
 
+  const resolveNarrationDisplay = (tx: Transaction): string | null => {
+    if (tx.narration && tx.narration.trim()) {
+      const trimmed = tx.narration.trim();
+      const lower = trimmed.toLowerCase();
+      if (!lower.startsWith("transfer to ") && !lower.startsWith("transfer of ")) {
+        return trimmed;
+      }
+    }
+    if (tx.description && tx.description.trim()) {
+      const trimmedDesc = tx.description.trim();
+      const lowerDesc = trimmedDesc.toLowerCase();
+      if (!lowerDesc.startsWith("transfer to ") && !lowerDesc.startsWith("transfer of ") && !lowerDesc.startsWith("wallet funding") && !lowerDesc.startsWith("wallet provisioning")) {
+        return trimmedDesc;
+      }
+    }
+    return null;
+  };
+
+  const displayNarration = resolveNarrationDisplay(transaction);
+
   // Logo Resolution
   const receiptHeaderName = config.receiptName || "E-TECH GLOBAL HUB";
   const receiptHeaderLogo = config.receiptLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
@@ -1121,6 +1141,13 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                       <span className="text-black font-bold">Transfer</span>
                     </div>
 
+                    {displayNarration && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Narration</span>
+                        <span className="text-black font-bold text-right max-w-[200px] truncate">{displayNarration}</span>
+                      </div>
+                    )}
+
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
                       <span>Amount</span>
                       <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
@@ -1805,10 +1832,10 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     </span>
                   </div>
 
-                  {transaction.narration && (
+                  {displayNarration && (
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
                       <span>Narration</span>
-                      <span className="text-black font-bold text-right max-w-[180px] truncate">{transaction.narration}</span>
+                      <span className="text-black font-bold text-right max-w-[180px] truncate">{displayNarration}</span>
                     </div>
                   )}
 

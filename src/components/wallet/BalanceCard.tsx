@@ -1832,7 +1832,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         account_name: trfAccountName,
         accountName: trfAccountName,
         currency: "NGN",
-        narration: trfNarration || `Transfer To ${trfAccountName}`,
+        narration: trfNarration.trim() || undefined,
         recipientName: trfAccountName,
         recipientAccount: trfAccount,
         reference: transferReference,
