@@ -567,17 +567,44 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   };
 
   const onCloneReceiptForHtml2Canvas = (clonedDoc: Document) => {
-    const styles = clonedDoc.querySelectorAll("style, link[rel='stylesheet']");
-    styles.forEach((style) => {
+    // 1. Remove external link stylesheets that may contain unsupported color syntax like oklab/oklch
+    const linkStyles = clonedDoc.querySelectorAll("link[rel='stylesheet']");
+    linkStyles.forEach((link) => link.remove());
+
+    // 2. Sanitize all inline <style> blocks
+    const styleElements = clonedDoc.querySelectorAll("style");
+    styleElements.forEach((style) => {
       try {
+        if (style.innerHTML) {
+          style.innerHTML = sanitizeCssString(style.innerHTML);
+        }
         if (style.textContent) {
           style.textContent = sanitizeCssString(style.textContent);
         }
       } catch (e) {
-        // Ignore CSS parsing issues in cloned document
+        // Ignore CSS parsing issues
       }
     });
 
+    // 3. Strip any CSS rules containing oklab/oklch from clonedDoc.styleSheets
+    try {
+      Array.from(clonedDoc.styleSheets).forEach((sheet) => {
+        try {
+          const rules = Array.from(sheet.cssRules || []);
+          for (let i = rules.length - 1; i >= 0; i--) {
+            if (rules[i].cssText && /(oklab|oklch|lab|lch|color)\(/i.test(rules[i].cssText)) {
+              try {
+                sheet.deleteRule(i);
+              } catch (err) {}
+            }
+          }
+        } catch (e) {
+          // Cross-origin or restricted stylesheet
+        }
+      });
+    } catch (e) {}
+
+    // 4. Sanitize element inline styles and computed unsupported color properties
     const UNSUPPORTED_PATTERN = /(oklab|oklch|lab|lch|color)\(/i;
     const clonedElements = clonedDoc.querySelectorAll("*");
 
@@ -1151,7 +1178,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
                       <span>Transfer To</span>
-                      <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">
+                      <span className="text-black font-bold uppercase text-right pl-3 break-words max-w-[220px]">
                         {transaction.beneficiaryName || transaction.recipientName || "Not available"}
                       </span>
                     </div>
@@ -1188,7 +1215,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     {displayNarration && (
                       <div className="flex justify-between items-start text-gray-500 font-semibold">
                         <span>Narration</span>
-                        <span className="text-black font-bold text-right max-w-[200px] truncate">{displayNarration}</span>
+                        <span className="text-black font-bold text-right pl-3 break-words max-w-[220px]">{displayNarration}</span>
                       </div>
                     )}
 
@@ -1681,7 +1708,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                       {displaySenderName && (
                         <div className="flex justify-between items-start text-gray-500 font-semibold">
                           <span>From</span>
-                          <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">{displaySenderName}</span>
+                          <span className="text-black font-bold uppercase text-right pl-3 break-words max-w-[220px]">{displaySenderName}</span>
                         </div>
                       )}
 
@@ -1835,7 +1862,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   {displayNarration && (
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
                       <span>Narration</span>
-                      <span className="text-black font-bold text-right max-w-[180px] truncate">{displayNarration}</span>
+                      <span className="text-black font-bold text-right pl-3 break-words max-w-[220px]">{displayNarration}</span>
                     </div>
                   )}
 
@@ -1998,7 +2025,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     {displayNarration && (
                       <div className="flex justify-between items-start">
                         <span className="text-gray-400 font-medium shrink-0">Remark</span>
-                        <span className="font-bold text-gray-900 text-right pl-3 truncate max-w-[200px]">{displayNarration}</span>
+                        <span className="font-bold text-gray-900 text-right pl-3 break-words max-w-[250px] leading-snug">{displayNarration}</span>
                       </div>
                     )}
 
