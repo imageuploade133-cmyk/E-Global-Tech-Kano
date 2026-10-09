@@ -57,11 +57,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "From Date cannot be later than To Date." }, { status: 400 });
     }
 
-    const sixMonthsInMs = 183 * 24 * 60 * 60 * 1000;
-    if (end.getTime() - start.getTime() > sixMonthsInMs) {
-      return NextResponse.json({ error: "Statements are limited to a maximum range of 6 months at a time." }, { status: 400 });
-    }
-
     // Fetch app config for statement logo, signature, stamp, and traditional watermark
     let statementLogoUrl = "https://i.ibb.co/WWjZrtC7/E-Tech.png";
     let statementSignatureUrl = "";
