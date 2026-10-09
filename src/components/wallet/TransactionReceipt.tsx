@@ -1913,10 +1913,26 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
               <div className="flex-1 overflow-y-auto px-4 py-2 flex flex-col items-center custom-scrollbar pb-28">
                 <div
                   ref={shareReceiptRef}
-                  className="w-full max-w-sm bg-white rounded-[24px] p-6 shadow-sm flex flex-col space-y-4 text-black border border-gray-100/80"
+                  className="relative w-full max-w-sm bg-white rounded-[24px] p-6 shadow-sm flex flex-col space-y-4 text-black border border-gray-100/80 overflow-hidden"
                 >
+                  {/* Optional Background Image Layer */}
+                  {config.receiptBgImageEnabled && config.receiptBgImageUrl && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden rounded-[24px]">
+                      <img
+                        src={config.receiptBgImageUrl}
+                        alt="Receipt Background"
+                        style={{
+                          opacity: config.receiptBgImageOpacity ?? 0.15,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    </div>
+                  )}
+
                   {/* Top Header: App Logo & Receipt Label */}
-                  <div className="flex justify-between items-center pb-2">
+                  <div className="relative z-10 flex justify-between items-center pb-2">
                     <div className="flex items-center gap-2">
                       <AppLogo size={32} />
                       <span className="font-extrabold text-lg text-black tracking-tight">{config.appName || "E-Global Pay"}</span>
@@ -1925,7 +1941,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   </div>
 
                   {/* Amount & Status */}
-                  <div className="text-center py-2 space-y-1">
+                  <div className="relative z-10 text-center py-2 space-y-1">
                     <h1 className="font-mono text-3xl font-extrabold text-[#00B96B]">
                       {currencySymbol}{displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </h1>
@@ -1933,10 +1949,10 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     <p className="text-[11px] text-gray-400 font-medium">{formattedDateTime}</p>
                   </div>
 
-                  <div className="border-b border-gray-100" />
+                  <div className="relative z-10 border-b border-gray-100" />
 
                   {/* Transaction Details */}
-                  <div className="space-y-3.5 text-xs">
+                  <div className="relative z-10 space-y-3.5 text-xs">
                     {/* Recipient Details */}
                     <div className="flex justify-between items-start">
                       <span className="text-gray-400 font-medium shrink-0 pt-0.5">Recipient Details</span>
@@ -1987,9 +2003,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   </div>
 
                   {/* Card Disclaimer Footer */}
-                  <div className="pt-3 border-t border-gray-100">
+                  <div className="relative z-10 pt-3 border-t border-gray-100">
                     <p className="text-[10px] text-gray-400 leading-relaxed font-normal">
-                      E-Global Pay is a Fintech app powered by Flutterwave, licensed by CBN and insured by NDIC.
+                      {config.receiptCbnText || "E-Global Pay is a Fintech app powered by Flutterwave, licensed by CBN and insured by NDIC."}
                     </p>
                   </div>
                 </div>
