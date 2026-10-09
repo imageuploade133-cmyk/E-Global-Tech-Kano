@@ -14,6 +14,7 @@ import { resolveBankName } from "@/lib/bank-resolver";
 import { getTransactionLedgerStatus } from "@/lib/transaction-status-normalizer";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { parseDataPlan } from "@/components/bills/types";
+import { AppLogo } from "@/components/AppLogo";
 
 export interface Transaction {
   id: string;
@@ -114,15 +115,19 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   onClose,
 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
+  const shareReceiptRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStatusText, setExportStatusText] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+
   const { getBillerLogo, getBankLogo, getStoreLogo, banks } = useLogos();
   const { config } = useAppConfig();
   const { userData } = useAuth();
 
   useModalBackHandler(Boolean(transaction), onClose, "transaction-receipt-modal");
+  useModalBackHandler(showShareModal, () => setShowShareModal(false), "share-receipt-modal");
 
   // Prevent background scrolling while modal is open
   useEffect(() => {
@@ -421,14 +426,141 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const dataPlanSize = parsedPlanData.size && parsedPlanData.size !== "Data Plan" ? parsedPlanData.size : (transaction.planName || "Data Package");
   const dataPlanValidity = (transaction.metadata as any)?.validity || (transaction.metadata as any)?.duration || parsedPlanData.duration || "30 Days";
 
-  // PDF Export (HD Quality)
+  // Account Number Masking Helper for Share Receipt (e.g. 807****034 or 969****144)
+  const maskAccountNum = (acc?: string | null): string => {
+    if (!acc) return "";
+    const clean = String(acc).replace(/\D/g, "");
+    if (clean.length <= 4) return clean;
+    if (clean.length === 10) {
+      return `${clean.slice(0, 3)}****${clean.slice(-3)}`;
+    }
+    return `${clean.slice(0, 2)}****${clean.slice(-2)}`;
+  };
+
+  // Real Sender Name Resolution
+  const resolveRealSenderName = (): string | null => {
+    const candidate = transaction.senderName;
+    if (!candidate || typeof candidate !== "string") return null;
+    const trimmedCandidate = candidate.trim();
+    if (trimmedCandidate.length === 0) return null;
+    return trimmedCandidate;
+  };
+
+  const displaySenderName = resolveRealSenderName();
+
+  const resolvedSenderBank = resolveBankName(
+    {
+      senderBankName: transaction.senderBankName,
+      senderBankCode: transaction.senderBankCode,
+    },
+    banks,
+    "TRANSFER_FROM"
+  );
+
+  const resolvedReceivingBank = resolveBankName(
+    {
+      virtualAccountBankName: transaction.virtualAccountBankName,
+      recipientBankName: transaction.recipientBankName || transaction.virtualAccountBankName,
+      recipientBankCode: transaction.recipientBankCode || transaction.beneficiaryBankCode,
+    },
+    banks,
+    "TRANSFER_TO"
+  );
+
+  const displayReceivingBank = resolvedReceivingBank !== "Bank"
+    ? resolvedReceivingBank
+    : (transaction.virtualAccountBankName || "Bank information unavailable");
+
+  // Share Receipt Fields Resolution
+  let recipientNameDisplay = "";
+  let recipientBankAndAcc = "";
+  let senderNameDisplay = "";
+  let senderBankAndAcc = "";
+  let txTypeDisplay = "";
+
+  const userFullName = String((userData as any)?.fullName || (userData as any)?.name || "");
+
+  if (isDeposit) {
+    txTypeDisplay = "Bank Deposit";
+
+    recipientNameDisplay = userFullName || transaction.recipientName || "E-Global User";
+    const recBank = displayReceivingBank !== "Bank" ? displayReceivingBank : (config.appName || "E-Global Pay");
+    const recAcc = maskAccountNum(transaction.virtualAccountNumber || userData?.virtualAccountNumber);
+    recipientBankAndAcc = recAcc ? `${recBank} | ${recAcc}` : recBank;
+
+    senderNameDisplay = displaySenderName || transaction.senderName || "Bank Transfer Sender";
+    const sendBank = resolvedSenderBank !== "Bank" ? resolvedSenderBank : (transaction.senderBankName || "Bank");
+    const sendAcc = maskAccountNum(transaction.senderAccountNumber);
+    senderBankAndAcc = sendAcc ? `${sendBank} | ${sendAcc}` : sendBank;
+  } else if (isTransfer) {
+    txTypeDisplay = "Bank Transfer";
+
+    recipientNameDisplay = transaction.beneficiaryName || transaction.recipientName || "Beneficiary";
+    const recBank = resolvedTransferToBank !== "Bank" ? resolvedTransferToBank : (transaction.recipientBankName || "Bank");
+    const recAcc = maskAccountNum(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber);
+    recipientBankAndAcc = recAcc ? `${recBank} | ${recAcc}` : recBank;
+
+    senderNameDisplay = userFullName || transaction.senderName || config.appName || "E-Global Pay User";
+    const sendBank = config.appName || "E-Global Pay";
+    const sendAcc = maskAccountNum(userData?.virtualAccountNumber || userData?.accountNumber || transaction.senderAccountNumber);
+    senderBankAndAcc = sendAcc ? `${sendBank} | ${sendAcc}` : sendBank;
+  } else if (isBill || isAirtime || isData || isElectricity || isCable || isWaec) {
+    txTypeDisplay = isAirtime ? "Airtime Top-up" : isData ? "Data Bundle" : isElectricity ? "Electricity Utility" : isCable ? "Cable TV" : isWaec ? "WAEC Purchase" : "Bill Payment";
+
+    recipientNameDisplay = detectedNetworkName || transaction.billerName || "Service Provider";
+    const targetNum = resolvedMobileNumber || transaction.phoneNumber || transaction.meterNumber || transaction.smartcardNumber || transaction.customerId;
+    const maskedTarget = maskAccountNum(targetNum);
+    recipientBankAndAcc = maskedTarget ? `${recipientNameDisplay} | ${maskedTarget}` : recipientNameDisplay;
+
+    senderNameDisplay = userFullName || config.appName || "E-Global Pay User";
+    const sendAcc = maskAccountNum(userData?.virtualAccountNumber || userData?.accountNumber);
+    senderBankAndAcc = sendAcc ? `${config.appName || "E-Global Pay"} | ${sendAcc}` : (config.appName || "E-Global Pay");
+  } else if (isStore) {
+    txTypeDisplay = "Store Purchase";
+
+    recipientNameDisplay = transaction.billerName || config.appName || "E-Global Store";
+    recipientBankAndAcc = `${config.appName || "E-Global Store"} | Store Order`;
+
+    senderNameDisplay = userFullName || "E-Global Customer";
+    const sendAcc = maskAccountNum(userData?.virtualAccountNumber || userData?.accountNumber);
+    senderBankAndAcc = sendAcc ? `${config.appName || "E-Global Pay"} | ${sendAcc}` : (config.appName || "E-Global Pay");
+  } else if (isSwap) {
+    txTypeDisplay = "Currency Swap";
+
+    recipientNameDisplay = `${transaction.destinationCurrency || "USD"} Wallet`;
+    recipientBankAndAcc = `Currency Exchange`;
+
+    senderNameDisplay = userFullName || "E-Global Customer";
+    senderBankAndAcc = `${transaction.sourceCurrency || "NGN"} Wallet`;
+  } else if (isRefund) {
+    txTypeDisplay = "Transaction Reversal";
+
+    recipientNameDisplay = userFullName || "E-Global User";
+    const recAcc = maskAccountNum(userData?.virtualAccountNumber || userData?.accountNumber);
+    recipientBankAndAcc = recAcc ? `${config.appName || "E-Global Pay"} | ${recAcc}` : (config.appName || "E-Global Pay");
+
+    senderNameDisplay = transaction.beneficiaryName || transaction.recipientName || detectedNetworkName || "Reversal Service";
+    senderBankAndAcc = "Reversal Refund";
+  } else {
+    txTypeDisplay = "Payment Transaction";
+
+    recipientNameDisplay = transaction.recipientName || transaction.beneficiaryName || "Recipient";
+    recipientBankAndAcc = resolvedTransferToBank !== "Bank" ? resolvedTransferToBank : (config.appName || "E-Global Pay");
+
+    senderNameDisplay = userFullName || "Sender";
+    senderBankAndAcc = config.appName || "E-Global Pay";
+  }
+
+  const displayAmount = (isHeldDeposit ? (Number(transaction.metadata?.heldAmount) || transaction.amount) : isRefund ? (Number(transaction.totalCredited) || (transaction.amount + fee + vat)) : transaction.amount);
+  const formattedDateTime = formatTransactionDateTime(transaction.createdAt, transaction.date, transaction.time).dateTime;
+  const statusText = ledgerStatus.label === "Credited" || ledgerStatus.label === "Debited" ? "Successful" : ledgerStatus.label;
+
+  // Canvas Sanitization for html2canvas
   const onCloneReceiptForHtml2Canvas = (clonedDoc: Document) => {
-    // 1. Remove or clean stylesheets that contain unsupported oklch() color functions
     const styles = clonedDoc.querySelectorAll("style, link[rel='stylesheet']");
     styles.forEach((style) => {
       try {
         if (style.textContent && style.textContent.includes("oklch")) {
-          // Replace oklch(...) occurrences in stylesheets with safe fallback hex/rgb or transparent
           style.textContent = style.textContent.replace(/oklch\([^)]+\)/gi, "rgba(0,0,0,0.1)");
         }
       } catch (e) {
@@ -436,7 +568,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
       }
     });
 
-    // 2. Iterate all elements in the cloned DOM tree and convert computed styles to inline RGB/RGBA
     const clonedElements = clonedDoc.querySelectorAll("*");
     clonedElements.forEach((el) => {
       const htmlEl = el as HTMLElement;
@@ -444,20 +575,14 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
       try {
         const computed = window.getComputedStyle(htmlEl);
-
-        // Sanitize background-color if it uses oklch
         const bg = computed.backgroundColor;
         if (bg && bg.includes("oklch")) {
           htmlEl.style.backgroundColor = "#FFFFFF";
         }
-
-        // Sanitize color if it uses oklch
         const color = computed.color;
         if (color && color.includes("oklch")) {
           htmlEl.style.color = "#000000";
         }
-
-        // Sanitize border-color if it uses oklch
         const border = computed.borderColor;
         if (border && border.includes("oklch")) {
           htmlEl.style.borderColor = "#E2E8F0";
@@ -466,83 +591,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         // Ignore style inspection failures
       }
     });
-  };
-
-  const handleDownloadPDF = async () => {
-    if (!receiptRef.current) return;
-    try {
-      setGenerating(true);
-      setIsExporting(true);
-      setExportProgress(10);
-      setExportStatusText("Preloading images & assets...");
-
-      await waitForReceiptImages(receiptRef.current, 5000);
-      setExportProgress(35);
-      setExportStatusText("Sanitizing styles & compiling DOM...");
-
-      const html2canvas = (await import("html2canvas")).default;
-      const { jsPDF } = await import("jspdf");
-
-      setExportProgress(55);
-      setExportStatusText("Rendering HD graphics...");
-
-      const canvas = await html2canvas(receiptRef.current, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#FFFFFF",
-        logging: false,
-        onclone: onCloneReceiptForHtml2Canvas,
-      });
-
-      setExportProgress(80);
-      setExportStatusText("Building PDF document...");
-
-      const imgData = canvas.toDataURL("image/png", 1.0);
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-
-      const imgWidth = 180;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const xPos = (pdfWidth - imgWidth) / 2;
-      const yPos = 15;
-
-      pdf.addImage(imgData, "PNG", xPos, yPos, imgWidth, imgHeight, undefined, "FAST");
-
-      const pdfFileName = `Receipt_${transaction.reference}.pdf`;
-      const pdfDataUri = pdf.output("datauristring");
-      const bridge =
-        typeof window !== "undefined"
-          ? (window as any).flutter_inappwebview
-          : null;
-
-      setExportProgress(95);
-      setExportStatusText("Finalizing PDF file...");
-
-      if (bridge && typeof bridge.callHandler === "function") {
-        const saved = await bridge.callHandler("downloadBase64File", {
-          data: pdfDataUri,
-          fileName: pdfFileName,
-          mimeType: "application/pdf",
-        });
-        if (saved !== true && !saved?.success) {
-          throw new Error("Native PDF download failed.");
-        }
-      } else {
-        pdf.save(pdfFileName);
-      }
-
-      setExportProgress(100);
-      toast.success("HD PDF Receipt downloaded!");
-    } catch (err) {
-      console.error("PDF generation failed:", err);
-      toast.error("Failed to generate PDF.");
-    } finally {
-      setTimeout(() => {
-        setIsExporting(false);
-        setGenerating(false);
-      }, 500);
-    }
   };
 
   const waitForReceiptImages = async (element: HTMLElement, timeoutMs = 5000): Promise<void> => {
@@ -583,115 +631,26 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     await Promise.race([Promise.all(imagePromises), timeoutPromise]);
   };
 
-  const handleDownloadImage = async () => {
-    if (!receiptRef.current) return;
-    try {
-      setGenerating(true);
-      setIsExporting(true);
-      setExportProgress(10);
-      setExportStatusText("Preloading images & logos...");
-
-      await waitForReceiptImages(receiptRef.current, 5000);
-      setExportProgress(40);
-      setExportStatusText("Sanitizing CSS & compiling canvas...");
-
-      const html2canvas = (await import("html2canvas")).default;
-
-      setExportProgress(65);
-      setExportStatusText("Rendering HD PNG image...");
-
-      const canvas = await html2canvas(receiptRef.current, {
-        scale: 3,
-        useCORS: true,
-        backgroundColor: "#FFFFFF",
-        logging: false,
-        onclone: onCloneReceiptForHtml2Canvas,
-      });
-
-      setExportProgress(85);
-      setExportStatusText("Converting image blob...");
-
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          console.error("Image generation failed: canvas.toBlob returned null.");
-          toast.error("Failed to generate PNG image.");
-          setIsExporting(false);
-          setGenerating(false);
-          return;
-        }
-
-        try {
-          setExportProgress(95);
-          setExportStatusText("Saving PNG image...");
-
-          const imageFileName = `Receipt_${transaction.reference}.png`;
-          const imageDataUri = canvas.toDataURL("image/png");
-          const bridge =
-            typeof window !== "undefined"
-              ? (window as any).flutter_inappwebview
-              : null;
-
-          if (bridge && typeof bridge.callHandler === "function") {
-            const saved = await bridge.callHandler("downloadBase64File", {
-              data: imageDataUri,
-              fileName: imageFileName,
-              mimeType: "image/png",
-            });
-            if (saved !== true && !saved?.success) {
-              throw new Error("Native image download failed.");
-            }
-          } else {
-            const objectUrl = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = objectUrl;
-            link.download = imageFileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-          }
-
-          setExportProgress(100);
-          toast.success("Image downloaded!");
-        } catch (err) {
-          console.error("Image download failed:", err);
-          toast.error("Failed to download image.");
-        } finally {
-          setTimeout(() => {
-            setIsExporting(false);
-            setGenerating(false);
-          }, 500);
-        }
-      }, "image/png");
-    } catch (err) {
-      console.error("Image generation failed:", err);
-      toast.error("Failed to generate image.");
-      setIsExporting(false);
-      setGenerating(false);
-    }
-  };
-
-  const handleShareReceipt = async () => {
-    if (!receiptRef.current) return;
+  const handleShareImageFromModal = async () => {
+    if (!shareReceiptRef.current) return;
     try {
       setGenerating(true);
       setIsExporting(true);
       setExportProgress(10);
       setExportStatusText("Preloading images...");
 
-      await waitForReceiptImages(receiptRef.current, 5000);
+      await waitForReceiptImages(shareReceiptRef.current, 5000);
       setExportProgress(40);
-      setExportStatusText("Rendering HD graphic canvas...");
+      setExportStatusText("Sanitizing CSS & compiling canvas...");
 
       const html2canvas = (await import("html2canvas")).default;
 
       setExportProgress(65);
-      setExportStatusText("Processing image...");
+      setExportStatusText("Rendering HD graphic...");
 
-      const canvas = await html2canvas(receiptRef.current, {
+      const canvas = await html2canvas(shareReceiptRef.current, {
         scale: 3,
         useCORS: true,
-        allowTaint: true,
         backgroundColor: "#FFFFFF",
         logging: false,
         onclone: onCloneReceiptForHtml2Canvas,
@@ -702,8 +661,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
       canvas.toBlob(async (blob) => {
         if (!blob) {
-          console.error("Image generation failed: canvas.toBlob returned null.");
-          toast.error("Failed to compile receipt.");
+          toast.error("Failed to compile receipt image.");
           setIsExporting(false);
           setGenerating(false);
           return;
@@ -717,7 +675,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
-            title: `${receiptHeaderName} Transaction Receipt`,
+            title: `${config.appName || "E-Global Pay"} Transaction Receipt`,
             text: `Transaction Receipt - ${transaction.reference}`,
           });
         } else {
@@ -729,14 +687,11 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
               : null;
 
           if (bridge && typeof bridge.callHandler === "function") {
-            const saved = await bridge.callHandler("downloadBase64File", {
+            await bridge.callHandler("downloadBase64File", {
               data: imageDataUri,
               fileName: imageFileName,
               mimeType: "image/png",
             });
-            if (saved !== true && !saved?.success) {
-              throw new Error("Native image download failed.");
-            }
           } else {
             const objectUrl = URL.createObjectURL(blob);
             const link = document.createElement("a");
@@ -748,7 +703,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
             setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
           }
 
-          toast.success("Downloaded HD receipt to device.");
+          toast.success("Downloaded HD receipt image.");
         }
 
         setExportProgress(100);
@@ -758,10 +713,84 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         }, 500);
       }, "image/png", 1.0);
     } catch (err) {
-      console.error("Image generation failed:", err);
-      toast.error("Failed to share receipt.");
+      console.error("Share image failed:", err);
+      toast.error("Failed to share image.");
       setIsExporting(false);
       setGenerating(false);
+    }
+  };
+
+  const handleSharePdfFromModal = async () => {
+    if (!shareReceiptRef.current) return;
+    try {
+      setGenerating(true);
+      setIsExporting(true);
+      setExportProgress(10);
+      setExportStatusText("Preloading assets...");
+
+      await waitForReceiptImages(shareReceiptRef.current, 5000);
+      setExportProgress(35);
+      setExportStatusText("Sanitizing styles & compiling...");
+
+      const html2canvas = (await import("html2canvas")).default;
+      const { jsPDF } = await import("jspdf");
+
+      setExportProgress(55);
+      setExportStatusText("Rendering HD PDF canvas...");
+
+      const canvas = await html2canvas(shareReceiptRef.current, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#FFFFFF",
+        logging: false,
+        onclone: onCloneReceiptForHtml2Canvas,
+      });
+
+      setExportProgress(80);
+      setExportStatusText("Building PDF document...");
+
+      const imgData = canvas.toDataURL("image/png", 1.0);
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+
+      const imgWidth = 180;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const xPos = (pdfWidth - imgWidth) / 2;
+      const yPos = 15;
+
+      pdf.addImage(imgData, "PNG", xPos, yPos, imgWidth, imgHeight, undefined, "FAST");
+
+      const pdfFileName = `Receipt_${transaction.reference}.pdf`;
+      const pdfDataUri = pdf.output("datauristring");
+      const bridge =
+        typeof window !== "undefined"
+          ? (window as any).flutter_inappwebview
+          : null;
+
+      setExportProgress(95);
+      setExportStatusText("Finalizing PDF...");
+
+      if (bridge && typeof bridge.callHandler === "function") {
+        await bridge.callHandler("downloadBase64File", {
+          data: pdfDataUri,
+          fileName: pdfFileName,
+          mimeType: "application/pdf",
+        });
+      } else {
+        pdf.save(pdfFileName);
+      }
+
+      setExportProgress(100);
+      toast.success("Downloaded HD PDF Receipt!");
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      toast.error("Failed to generate PDF.");
+    } finally {
+      setTimeout(() => {
+        setIsExporting(false);
+        setGenerating(false);
+      }, 500);
     }
   };
 
@@ -783,13 +812,13 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           </button>
           <div className="text-center">
             <h2 className="font-hanken font-bold text-base text-black">
-              Transaction Receipt
+              Transaction Details
             </h2>
           </div>
           <div className="w-10" />
         </div>
 
-        {/* Scrollable Receipt Canvas */}
+        {/* Scrollable Transaction Specifications Canvas */}
         <div className="flex-1 overflow-y-auto p-margin-mobile flex flex-col items-center custom-scrollbar pb-28">
           <div
             ref={receiptRef}
@@ -875,7 +904,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 </h2>
                 <h1 className="font-mono text-3xl font-black text-black tracking-tight mt-1">
                   {currencySymbol}
-                  {(isHeldDeposit ? (Number(transaction.metadata?.heldAmount) || transaction.amount) : isRefund ? (Number(transaction.totalCredited) || (transaction.amount + fee + vat)) : transaction.amount).toLocaleString(undefined, {
+                  {displayAmount.toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
@@ -1493,13 +1522,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
                   const feeAmt = Number(transaction.fee) || 0;
 
-                  const maskAcc = (acc?: string) => {
-                    if (!acc) return null;
-                    const clean = acc.replace(/\D/g, "");
-                    if (clean.length <= 4) return clean;
-                    return "****" + clean.slice(-4);
-                  };
-
                   const maskVirt = (vAcc?: string) => {
                     if (!vAcc) return null;
                     const clean = vAcc.replace(/\D/g, "");
@@ -1628,39 +1650,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   // Default: Dynamic Virtual Account / Bank Transfer
                   const displaySenderAccount = transaction.senderAccountNumber ? String(transaction.senderAccountNumber).trim() : null;
                   const maskedVirtualAccount = maskVirt(transaction.virtualAccountNumber);
-
-                  const resolveRealSenderName = (): string | null => {
-                    const candidate = transaction.senderName;
-                    if (!candidate || typeof candidate !== "string") return null;
-                    const trimmedCandidate = candidate.trim();
-                    if (trimmedCandidate.length === 0) return null;
-                    return trimmedCandidate;
-                  };
-
-                  const displaySenderName = resolveRealSenderName();
-
-                  const resolvedSenderBank = resolveBankName(
-                    {
-                      senderBankName: transaction.senderBankName,
-                      senderBankCode: transaction.senderBankCode,
-                    },
-                    banks,
-                    "TRANSFER_FROM"
-                  );
-
-                  const resolvedReceivingBank = resolveBankName(
-                    {
-                      virtualAccountBankName: transaction.virtualAccountBankName,
-                      recipientBankName: transaction.recipientBankName || transaction.virtualAccountBankName,
-                      recipientBankCode: transaction.recipientBankCode || transaction.beneficiaryBankCode,
-                    },
-                    banks,
-                    "TRANSFER_TO"
-                  );
-
-                  const displayReceivingBank = resolvedReceivingBank !== "Bank"
-                    ? resolvedReceivingBank
-                    : (transaction.virtualAccountBankName || "Bank information unavailable");
 
                   const meta = (transaction.metadata || {}) as Record<string, any>;
                   const autoInflowFee = Number(meta.autoInflowFee) || (feeAmt > 0 ? feeAmt : 0);
@@ -1824,11 +1813,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   <div className="flex justify-between items-center text-gray-500 font-semibold">
                     <span>Transaction Date</span>
                     <span className="text-black font-bold text-right">
-                      {formatTransactionDateTime(
-                        transaction.createdAt,
-                        transaction.date,
-                        transaction.time
-                      ).dateTime}
+                      {formattedDateTime}
                     </span>
                   </div>
 
@@ -1890,36 +1875,151 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           )}
         </AnimatePresence>
 
-        {/* Action Buttons Panel */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex gap-2 shadow-lg z-10">
+        {/* Single Bottom Action Button: Share Receipt */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 shadow-lg z-10">
           <button
             type="button"
-            disabled={generating}
-            onClick={handleDownloadPDF}
-            className="flex-1 py-2.5 bg-red-50/50 hover:bg-red-100 text-red-600 text-[10px] font-bold uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 border border-red-200/40 disabled:opacity-50"
+            onClick={() => setShowShareModal(true)}
+            className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#E06600] text-white font-bold text-sm uppercase tracking-wider rounded-2xl cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
           >
-            <span className="material-symbols-outlined text-xs font-bold">picture_as_pdf</span>
-            PDF
-          </button>
-          <button
-            type="button"
-            disabled={generating}
-            onClick={handleDownloadImage}
-            className="flex-1 py-2.5 bg-blue-50/50 hover:bg-blue-100 text-blue-600 text-[10px] font-bold uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 border border-blue-200/40 disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined text-xs font-bold">image</span>
-            PNG
-          </button>
-          <button
-            type="button"
-            disabled={generating}
-            onClick={handleShareReceipt}
-            className="flex-1 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white text-[10px] font-bold uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined text-xs font-bold">share</span>
-            Share
+            <span className="material-symbols-outlined text-xl font-bold">share</span>
+            Share Receipt
           </button>
         </div>
+
+        {/* Full-Screen "Share Receipt" High-Fidelity Ticket Modal */}
+        <AnimatePresence>
+          {showShareModal && (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 30 }}
+              className="fixed inset-0 w-full h-full bg-[#F5F6F8] z-[100005] flex flex-col select-none overflow-hidden text-black"
+            >
+              {/* Modal Top Navigation */}
+              <div className="safe-top bg-[#F5F6F8] px-5 py-4 flex items-center justify-between shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowShareModal(false)}
+                  className="flex items-center gap-2 text-gray-800 font-semibold text-base active:scale-95 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-2xl font-bold">arrow_back</span>
+                  <span>Share Receipt</span>
+                </button>
+                <div className="w-8" />
+              </div>
+
+              {/* Ticket Card Container */}
+              <div className="flex-1 overflow-y-auto px-4 py-2 flex flex-col items-center custom-scrollbar pb-28">
+                <div
+                  ref={shareReceiptRef}
+                  className="w-full max-w-sm bg-white rounded-[24px] p-6 shadow-sm flex flex-col space-y-4 text-black border border-gray-100/80"
+                >
+                  {/* Top Header: App Logo & Receipt Label */}
+                  <div className="flex justify-between items-center pb-2">
+                    <div className="flex items-center gap-2">
+                      <AppLogo size={32} />
+                      <span className="font-extrabold text-lg text-black tracking-tight">{config.appName || "E-Global Pay"}</span>
+                    </div>
+                    <span className="text-xs font-semibold text-gray-500">Transaction Receipt</span>
+                  </div>
+
+                  {/* Amount & Status */}
+                  <div className="text-center py-2 space-y-1">
+                    <h1 className="font-mono text-3xl font-extrabold text-[#00B96B]">
+                      {currencySymbol}{displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </h1>
+                    <p className="font-bold text-sm text-gray-900">{statusText}</p>
+                    <p className="text-[11px] text-gray-400 font-medium">{formattedDateTime}</p>
+                  </div>
+
+                  <div className="border-b border-gray-100" />
+
+                  {/* Transaction Details */}
+                  <div className="space-y-3.5 text-xs">
+                    {/* Recipient Details */}
+                    <div className="flex justify-between items-start">
+                      <span className="text-gray-400 font-medium shrink-0 pt-0.5">Recipient Details</span>
+                      <div className="text-right flex flex-col items-end pl-3">
+                        <span className="font-bold text-gray-900 leading-tight">{recipientNameDisplay}</span>
+                        <span className="text-gray-500 text-[11px] font-medium leading-tight mt-0.5">{recipientBankAndAcc}</span>
+                      </div>
+                    </div>
+
+                    {/* Sender Details */}
+                    <div className="flex justify-between items-start">
+                      <span className="text-gray-400 font-medium shrink-0 pt-0.5">Sender Details</span>
+                      <div className="text-right flex flex-col items-end pl-3">
+                        <span className="font-bold text-gray-900 leading-tight">{senderNameDisplay}</span>
+                        <span className="text-gray-500 text-[11px] font-medium leading-tight mt-0.5">{senderBankAndAcc}</span>
+                      </div>
+                    </div>
+
+                    {/* Transaction Type */}
+                    {txTypeDisplay && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400 font-medium">Transaction Type</span>
+                        <span className="font-bold text-gray-900 text-right">{txTypeDisplay}</span>
+                      </div>
+                    )}
+
+                    {/* Remark / Narration */}
+                    {displayNarration && (
+                      <div className="flex justify-between items-start">
+                        <span className="text-gray-400 font-medium shrink-0">Remark</span>
+                        <span className="font-bold text-gray-900 text-right pl-3 truncate max-w-[200px]">{displayNarration}</span>
+                      </div>
+                    )}
+
+                    {/* Transaction No. */}
+                    <div className="flex justify-between items-start">
+                      <span className="text-gray-400 font-medium shrink-0">Transaction No.</span>
+                      <span className="font-mono font-semibold text-gray-900 text-right text-[11px] pl-3 break-all">{transaction.reference}</span>
+                    </div>
+
+                    {/* Session ID */}
+                    {transaction.sessionId && (
+                      <div className="flex justify-between items-start">
+                        <span className="text-gray-400 font-medium shrink-0">Session ID</span>
+                        <span className="font-mono font-semibold text-gray-900 text-right text-[11px] pl-3 break-all">{transaction.sessionId}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card Disclaimer Footer */}
+                  <div className="pt-3 border-t border-gray-100">
+                    <p className="text-[10px] text-gray-400 leading-relaxed font-normal">
+                      E-Global Pay is a Fintech app powered by Flutterwave, licensed by CBN and insured by NDIC.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Share Actions Bar */}
+              <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex items-center justify-around shadow-lg z-20">
+                <button
+                  type="button"
+                  disabled={generating}
+                  onClick={handleShareImageFromModal}
+                  className="flex-1 py-3 flex items-center justify-center gap-2 text-[#00B96B] font-bold text-sm hover:bg-gray-50 active:scale-95 transition-all rounded-xl cursor-pointer disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-lg font-bold">image</span>
+                  <span>Share as image</span>
+                </button>
+                <div className="w-[1px] h-6 bg-gray-200" />
+                <button
+                  type="button"
+                  disabled={generating}
+                  onClick={handleSharePdfFromModal}
+                  className="flex-1 py-3 flex items-center justify-center gap-2 text-[#00B96B] font-bold text-sm hover:bg-gray-50 active:scale-95 transition-all rounded-xl cursor-pointer disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-lg font-bold">picture_as_pdf</span>
+                  <span>Share as PDF</span>
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </AnimatePresence>
   );

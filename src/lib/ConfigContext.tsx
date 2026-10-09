@@ -7,6 +7,7 @@ import { FeatureToggles, DEFAULT_FEATURE_TOGGLES } from "@/lib/feature-toggle";
 
 export interface AppConfig {
   featureToggles?: FeatureToggles;
+  appName?: string;
   logoUrl: string;
   receiptLogoUrl?: string;
   receiptName?: string;
@@ -82,6 +83,7 @@ export interface AppConfig {
 const DEFAULT_CONFIG: AppConfig = {
   appVersionPushNotificationEnabled: true,
   featureToggles: DEFAULT_FEATURE_TOGGLES,
+  appName: "E-Global Pay",
   logoUrl: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
   receiptLogoUrl: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
   receiptName: "E-TECH GLOBAL HUB",
