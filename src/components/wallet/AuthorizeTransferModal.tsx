@@ -66,6 +66,14 @@ export const AuthorizeTransferModal: React.FC<AuthorizeTransferModalProps> = ({
     if (enteredPin.length < 4) {
       const nextPin = enteredPin + num;
       setEnteredPin(nextPin);
+      if (nextPin.length === 4) {
+        if (is2faActive) {
+          setVerifiedPin(nextPin);
+          setIs2faStage(true);
+        } else {
+          onExecuteTransfer(nextPin);
+        }
+      }
     }
   };
 
