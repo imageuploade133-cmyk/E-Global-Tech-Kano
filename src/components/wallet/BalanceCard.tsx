@@ -1512,7 +1512,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       beneficiaryAccountNumber: isBulkMode ? "Multiple" : trfAccount,
       recipientBankCode: trfBank?.code,
       beneficiaryBankCode: trfBank?.code,
-      senderName: userData?.name || userData?.displayName || "Account Holder",
+      senderName: String(userData?.name || userData?.displayName || "Account Holder"),
     };
     setCompletedTxForReceipt(completedTx);
   };
