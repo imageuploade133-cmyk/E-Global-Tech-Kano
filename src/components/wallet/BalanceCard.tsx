@@ -11,6 +11,7 @@ import { db } from "@/lib/firebase";
 import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
 import { TierUpgradeDrawerModal } from "@/components/profile/TransferLimitsSection";
+import { TransferPinModal } from "@/components/wallet/TransferPinModal";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { AppLogo } from "@/components/AppLogo";
@@ -529,9 +530,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     else if (wizardStep === "transfer-pay") setWizardStep("methods");
   }, "add-money-substep");
 
+  const [isTrfPinModalOpen, setIsTrfPinModalOpen] = useState(false);
+
   useModalBackHandler(isTransferOpen, () => handleCloseTransferModal(), "transfer-modal");
   useModalBackHandler(isTransferOpen && trfStep === "confirm", () => setTrfStep("input"), "transfer-step-confirm");
-  useModalBackHandler(isTransferOpen && trfStep === "pin", () => setTrfStep("confirm"), "transfer-step-pin");
+  useModalBackHandler(isTrfPinModalOpen, () => setIsTrfPinModalOpen(false), "transfer-pin-modal");
   useModalBackHandler(isTransferOpen && showTrfBankSelector, () => setShowTrfBankSelector(false), "bank-selector-modal");
   useModalBackHandler(isTransferOpen && showSaveBeneficiaryPrompt, () => setShowSaveBeneficiaryPrompt(false), "save-beneficiary-prompt");
 
@@ -4519,9 +4522,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     type="button"
                     onClick={() => {
                       triggerHaptic();
-                      setTrfPin("");
-                      setIsTrf2faStage(false);
-                      setTrfStep("pin");
+                      setIsTrfPinModalOpen(true);
                     }}
                     className="w-full py-4 bg-black hover:bg-black/90 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2 border-0 relative z-30"
                   >
@@ -5033,6 +5034,23 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       isOpen={isTierUpgradeOpen}
       onClose={() => setIsTierUpgradeOpen(false)}
       onRequestSubmitted={() => setIsTierUpgradeOpen(false)}
+    />
+
+    {/* Dedicated Full-Screen Transfer PIN Verification Modal */}
+    <TransferPinModal
+      isOpen={isTrfPinModalOpen}
+      recipientName={isBulkMode ? `${bulkRecipients.length} Batch Recipients` : trfAccountName}
+      bankName={isBulkMode ? "Multiple Banks" : trfBank?.name || "Bank"}
+      accountNumber={isBulkMode ? "Multiple" : trfAccount}
+      amount={parseFloat(trfAmount) || 0}
+      fee={trfFee}
+      totalDebit={trfTotalDebit}
+      walletBalance={balance}
+      onClose={() => setIsTrfPinModalOpen(false)}
+      onExecuteTransfer={(pin, isBiometric) => {
+        setIsTrfPinModalOpen(false);
+        executeOutwardTransfer(pin, isBiometric);
+      }}
     />
     </>
   );
