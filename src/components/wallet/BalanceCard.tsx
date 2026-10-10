@@ -534,7 +534,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   useModalBackHandler(isTransferOpen, () => handleCloseTransferModal(), "transfer-modal");
   useModalBackHandler(isTransferOpen && trfStep === "confirm", () => setTrfStep("input"), "transfer-step-confirm");
-  useModalBackHandler(isTrfPinModalOpen, () => setIsTrfPinModalOpen(false), "transfer-pin-modal");
   useModalBackHandler(isTransferOpen && showTrfBankSelector, () => setShowTrfBankSelector(false), "bank-selector-modal");
   useModalBackHandler(isTransferOpen && showSaveBeneficiaryPrompt, () => setShowSaveBeneficiaryPrompt(false), "save-beneficiary-prompt");
 
