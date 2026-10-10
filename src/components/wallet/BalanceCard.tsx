@@ -20,6 +20,8 @@ import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggl
 import { triggerHaptic } from "@/lib/haptics";
 import { TwoFactorOtpVerificationView } from "@/components/auth/TwoFactorOtpVerificationView";
 import { getBiometricLabel, getBiometricType, authenticateBiometricDetailed } from "@/lib/biometrics-util";
+import { TransactionReceipt, Transaction } from "@/components/wallet/TransactionReceipt";
+import { cn } from "@/lib/utils";
 
 interface BalanceCardProps {
   balance: number;
@@ -494,6 +496,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [trfPin, setTrfPin] = useState("");
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferResult, setTransferResult] = useState<{ success: boolean; message: string; reference?: string } | null>(null);
+  const [completedTxForReceipt, setCompletedTxForReceipt] = useState<Transaction | null>(null);
+  const [isBeneficiarySaved, setIsBeneficiarySaved] = useState(false);
   const [bankSearchQuery, setBankSearchQuery] = useState("");
   const [showTrfBankSelector, setShowTrfBankSelector] = useState(false);
 
@@ -1468,6 +1472,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setTrfTotalDebit(0);
       setTrfPin("");
       setTransferResult(null);
+      setCompletedTxForReceipt(null);
+      setIsBeneficiarySaved(false);
       setBankSearchQuery("");
       setShowTrfBankSelector(false);
       setIsBulkMode(false);
@@ -1478,6 +1484,47 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setBulkAmountVal("");
 
     }, 300);
+  };
+
+  const handleViewReceipt = () => {
+    const completedTx: Transaction = {
+      id: transferResult?.reference || `trf-${Date.now()}`,
+      reference: transferResult?.reference || `trf-${Date.now()}`,
+      type: "TRANSFER",
+      category: "TRANSFER",
+      direction: "DEBIT",
+      amount: parseFloat(trfAmount) || 0,
+      currency: "NGN",
+      fee: trfFee,
+      totalDebited: trfTotalDebit,
+      status: "SUCCESS",
+      description: trfNarration.trim() || `Transfer to ${trfAccountName}`,
+      narration: trfNarration.trim() || `Transfer to ${trfAccountName}`,
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }),
+      createdAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      recipientName: isBulkMode ? `${bulkRecipients.length} Batch Recipients` : trfAccountName,
+      beneficiaryName: isBulkMode ? `${bulkRecipients.length} Batch Recipients` : trfAccountName,
+      recipientBankName: isBulkMode ? "Multiple Banks" : trfBank?.name,
+      beneficiaryBankName: isBulkMode ? "Multiple Banks" : trfBank?.name,
+      recipientAccountNumber: isBulkMode ? "Multiple" : trfAccount,
+      beneficiaryAccountNumber: isBulkMode ? "Multiple" : trfAccount,
+      recipientBankCode: trfBank?.code,
+      beneficiaryBankCode: trfBank?.code,
+      senderName: userData?.name || userData?.displayName || "Account Holder",
+    };
+    setCompletedTxForReceipt(completedTx);
+  };
+
+  const handleSaveBeneficiaryAction = async () => {
+    if (isBeneficiarySaved) return;
+    if (isBulkMode) {
+      await handleSaveBulkBeneficiaries();
+    } else {
+      await handleSaveBeneficiary();
+    }
+    setIsBeneficiarySaved(true);
   };
 
   const formatTime = (seconds: number) => {
@@ -1865,6 +1912,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           message: `Your outward bank transfer has been initiated successfully! ₦${parseFloat(trfAmount).toLocaleString()} is being settled to ${trfAccountName}.`,
           reference: data.reference,
         });
+        const isAlreadySaved = beneficiaries.some((b) => b.accountNumber === trfAccount);
+        setIsBeneficiarySaved(isAlreadySaved);
         handleSaveRecent();
         setTrfStep("completion");
 
@@ -4372,16 +4421,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </motion.div>
               )}
 
-              {/* STAGE 3: Gorgeous Success Animation & Receipt details Screen (TASK 7) */}
+              {/* STAGE 3: Bank Transfer Success Screen */}
               {trfStep === "completion" && transferResult && (
                 <motion.div
                   key="trf-completion"
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
-                  className="space-y-5 text-center flex flex-col items-center py-4 flex-1 justify-between"
+                  className="space-y-4 text-center flex flex-col items-center py-2 flex-1 justify-between font-hanken"
                 >
-                  <div className="space-y-5 w-full overflow-y-auto no-scrollbar pr-1 pb-4">
+                  <div className="space-y-4 w-full overflow-y-auto no-scrollbar pr-1 pb-2">
                     {/* Pulsing visual animated check indicator badge */}
                     <motion.div
                       initial={{ scale: 0 }}
@@ -4389,114 +4438,119 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       transition={{ duration: 0.5, ease: "easeOut" }}
                       className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-inner"
                     >
-                      <span className="material-symbols-outlined text-[32px] font-black" style={{ fontVariationSettings: '"FILL" 1' }}>check_circle</span>
+                      <span className="material-symbols-outlined text-[36px] font-black" style={{ fontVariationSettings: '"FILL" 1' }}>
+                        check_circle
+                      </span>
                     </motion.div>
 
                     <div>
-                      <h4 className="font-hanken font-black text-lg text-gray-900 leading-tight">Transfer Successful!</h4>
+                      <h4 className="font-hanken font-black text-lg text-gray-900 leading-tight">
+                        Transfer Successful!
+                      </h4>
                       <p className="font-hanken text-xs text-gray-500 mt-1 font-semibold leading-relaxed max-w-[280px] mx-auto">
                         Your outward bank transfer has been successfully initiated.
                       </p>
                     </div>
 
-                    {/* Detailed structured Receipt parameters */}
-                    <div className="w-full bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2.5 text-left font-hanken text-xs">
-                      <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
+                    {/* Detailed structured summary breakdown */}
+                    <div className="w-full bg-gray-50 rounded-2xl p-4 border border-gray-200/80 space-y-2.5 text-left font-hanken text-xs shadow-2xs">
+                      <div className="flex justify-between items-center text-gray-600 font-semibold">
+                        <span>Transfer Amount</span>
+                        <span className="font-mono font-bold text-gray-900">
+                          ₦{(parseFloat(trfAmount) || 0).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-gray-600 font-semibold border-t border-gray-200/50 pt-2">
+                        <span>Transfer Fee</span>
+                        <span className="font-mono font-bold text-gray-700">
+                          {trfFee > 0 ? `₦${trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : "₦0.00 (Free)"}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center border-t border-gray-200/50 pt-2 font-bold text-gray-800">
+                        <span>Total Debited</span>
+                        <span className="font-mono font-black text-emerald-600 text-sm">
+                          ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between border-t border-gray-200/50 pt-2 text-gray-500">
                         <span>Recipient</span>
-                        <span className="font-bold text-black uppercase truncate max-w-[180px]">{isBulkMode ? "Batch Recipients" : trfAccountName}</span>
+                        <span className="font-extrabold text-black uppercase truncate max-w-[180px]">
+                          {isBulkMode ? `${bulkRecipients.length} Batch Recipients` : trfAccountName}
+                        </span>
                       </div>
-                      <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
-                        <span>Amount Debited</span>
-                        <span className="font-mono font-black text-emerald-600">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-                      </div>
-                      <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
+
+                      {!isBulkMode && trfBank && (
+                        <div className="flex justify-between border-t border-gray-200/50 pt-2 text-gray-500">
+                          <span>Destination Bank</span>
+                          <span className="font-semibold text-gray-800 uppercase truncate max-w-[180px]">
+                            {trfBank.name} ({trfAccount})
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between border-t border-gray-200/50 pt-2 text-gray-500">
                         <span>Reference Code</span>
-                        <span className="font-mono font-bold text-black select-all">{transferResult.reference || "N/A"}</span>
+                        <span className="font-mono font-bold text-black select-all">
+                          {transferResult.reference || "N/A"}
+                        </span>
                       </div>
-                      <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
+
+                      <div className="flex justify-between border-t border-gray-200/50 pt-2 text-gray-500">
                         <span>Settlement Date</span>
                         <span className="font-bold text-black">{new Date().toLocaleString()}</span>
                       </div>
-                      <p className="text-[10px] text-gray-400 leading-relaxed font-medium pt-1 text-center">
-                        Funds are usually settled instantly. You can check your transaction history ledger any time.
-                      </p>
                     </div>
-
-                    {/* Dynamic Beneficiary Add Prompt */}
-                    {showSaveBeneficiaryPrompt && (
-                      <div className="w-full bg-[#FFF9F5] border border-orange-200 rounded-2xl p-4 text-left space-y-2 animate-fade-in">
-                        <p className="font-hanken text-[11px] font-black text-gray-700 uppercase tracking-wide flex items-center gap-1">
-                          <span className="material-symbols-outlined text-orange-500 text-[14px]">person_add</span>
-                          Save Recipient to Beneficiaries?
-                        </p>
-                        <p className="font-hanken text-[10px] text-gray-500 font-semibold leading-relaxed">
-                          Would you like to save {isBulkMode ? `${bulkRecipients.length} batch recipients` : trfAccountName} to your Beneficiaries list for faster access next time?
-                        </p>
-                        <div className="flex gap-2.5 pt-1">
-                          <button
-                            type="button"
-                            onClick={isBulkMode ? handleSaveBulkBeneficiaries : handleSaveBeneficiary}
-                            className="flex-1 py-2 bg-[#FC7A00] text-white rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-sm"
-                          >
-                            <span className="material-symbols-outlined text-[12px]">check</span>
-                            Yes, Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowSaveBeneficiaryPrompt(false);
-                              toast.info("Recipient kept as Recent only.");
-                              loadRecentsAndBeneficiaries();
-                            }}
-                            className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1"
-                          >
-                            <span className="material-symbols-outlined text-[12px]">close</span>
-                            No, Skip
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Actions Bar */}
-                  <div className="w-full space-y-2.5 flex-shrink-0 mt-3 select-none">
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {/* Download Image Action */}
+                  {/* Redesigned 4 Action Buttons Bar */}
+                  <div className="w-full space-y-2 flex-shrink-0 pt-2 select-none">
+                    {/* Row 1: View Receipt & Share Receipt */}
+                    <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={downloadReceiptImage}
-                        className="py-3 bg-gray-50 hover:bg-orange-50/50 border border-gray-200 hover:border-[#FC7A00]/40 text-black text-[10.5px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-2xs"
+                        onClick={handleViewReceipt}
+                        className="py-3 bg-gray-50 hover:bg-orange-50/50 border border-gray-200 hover:border-[#FC7A00]/40 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-2xs"
                       >
-                        <span className="material-symbols-outlined text-[17px] text-[#FC7A00]">image</span>
-                        <span>Download Image</span>
+                        <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">receipt_long</span>
+                        <span>View Receipt</span>
                       </button>
 
-                      {/* Download PDF Action */}
                       <button
                         type="button"
-                        onClick={downloadReceiptPDF}
-                        className="py-3 bg-gray-50 hover:bg-rose-50/50 border border-gray-200 hover:border-rose-300 text-black text-[10.5px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-2xs"
+                        onClick={shareReceiptImage}
+                        className="py-3 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-2xs"
                       >
-                        <span className="material-symbols-outlined text-[17px] text-rose-500">picture_as_pdf</span>
-                        <span>Download PDF</span>
+                        <span className="material-symbols-outlined text-[18px] text-emerald-600">share</span>
+                        <span>Share Receipt</span>
                       </button>
                     </div>
 
-                    {/* Share Receipt functional trigger with WhatsApp & Native Share API */}
+                    {/* Row 2: Save Beneficiary Button */}
                     <button
                       type="button"
-                      onClick={shareReceiptImage}
-                      className="w-full py-3 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-[10.5px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-2 shadow-2xs"
+                      disabled={isBeneficiarySaved}
+                      onClick={handleSaveBeneficiaryAction}
+                      className={cn(
+                        "w-full py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 border shadow-2xs",
+                        isBeneficiarySaved
+                          ? "bg-gray-100 text-gray-500 border-gray-200 cursor-default"
+                          : "bg-orange-50 hover:bg-orange-100/80 border-orange-200 text-[#FC7A00] cursor-pointer active:scale-98"
+                      )}
                     >
-                      <span className="material-symbols-outlined text-[18px] text-emerald-600">share</span>
-                      <span>Share Receipt to WhatsApp / Apps</span>
+                      <span className="material-symbols-outlined text-[18px]">
+                        {isBeneficiarySaved ? "check_circle" : "person_add"}
+                      </span>
+                      <span>{isBeneficiarySaved ? "Saved to Beneficiaries" : "Save Beneficiary"}</span>
                     </button>
 
-                    {/* Done Action Button */}
+                    {/* Row 3: Done Action Button */}
                     <button
                       type="button"
                       onClick={handleCloseTransferModal}
-                      className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all shadow-sm border-0"
+                      className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer hover:brightness-105 active:scale-98 transition-all shadow-sm border-0"
                     >
                       Done
                     </button>
@@ -5089,6 +5143,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         executeOutwardTransfer(pin, isBiometric);
       }}
     />
+
+    {/* Full Detailed Transaction Receipt Modal */}
+    {completedTxForReceipt && (
+      <TransactionReceipt
+        transaction={completedTxForReceipt}
+        onClose={() => setCompletedTxForReceipt(null)}
+      />
+    )}
 
     </>
   );
