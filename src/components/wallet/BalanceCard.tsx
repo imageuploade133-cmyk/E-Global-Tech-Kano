@@ -4454,28 +4454,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                     {/* Detailed structured summary breakdown */}
                     <div className="w-full bg-gray-50 rounded-2xl p-4 border border-gray-200/80 space-y-2.5 text-left font-hanken text-xs shadow-2xs">
-                      <div className="flex justify-between items-center text-gray-600 font-semibold">
-                        <span>Transfer Amount</span>
-                        <span className="font-mono font-bold text-gray-900">
-                          ₦{(parseFloat(trfAmount) || 0).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center text-gray-600 font-semibold border-t border-gray-200/50 pt-2">
-                        <span>Transfer Fee</span>
-                        <span className="font-mono font-bold text-gray-700">
-                          {trfFee > 0 ? `₦${trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : "₦0.00 (Free)"}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center border-t border-gray-200/50 pt-2 font-bold text-gray-800">
-                        <span>Total Debited</span>
-                        <span className="font-mono font-black text-emerald-600 text-sm">
-                          ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between border-t border-gray-200/50 pt-2 text-gray-500">
+                      <div className="flex justify-between items-center text-gray-500 border-b border-gray-200/50 pb-2">
                         <span>Recipient</span>
                         <span className="font-extrabold text-black uppercase truncate max-w-[180px]">
                           {isBulkMode ? `${bulkRecipients.length} Batch Recipients` : trfAccountName}
@@ -4483,7 +4462,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </div>
 
                       {!isBulkMode && trfBank && (
-                        <div className="flex justify-between border-t border-gray-200/50 pt-2 text-gray-500">
+                        <div className="flex justify-between items-center text-gray-500 border-b border-gray-200/50 pb-2">
                           <span>Destination Bank</span>
                           <span className="font-semibold text-gray-800 uppercase truncate max-w-[180px]">
                             {trfBank.name} ({trfAccount})
@@ -4491,17 +4470,42 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         </div>
                       )}
 
-                      <div className="flex justify-between border-t border-gray-200/50 pt-2 text-gray-500">
+                      <div className="flex justify-between items-center text-gray-500 border-b border-gray-200/50 pb-2">
+                        <span>Transfer Amount</span>
+                        <span className="font-mono font-bold text-gray-900">
+                          ₦{(parseFloat(trfAmount) || 0).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-gray-500 border-b border-gray-200/50 pb-2">
+                        <span>Transfer Fee</span>
+                        <span className="font-mono font-bold text-gray-700">
+                          {trfFee > 0 ? `₦${trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : "₦0.00 (Free)"}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center border-b border-gray-200/50 pb-2 font-bold text-gray-800">
+                        <span>Amount Debited</span>
+                        <span className="font-mono font-black text-emerald-600 text-sm">
+                          ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-gray-500 border-b border-gray-200/50 pb-2">
                         <span>Reference Code</span>
                         <span className="font-mono font-bold text-black select-all">
                           {transferResult.reference || "N/A"}
                         </span>
                       </div>
 
-                      <div className="flex justify-between border-t border-gray-200/50 pt-2 text-gray-500">
+                      <div className="flex justify-between items-center text-gray-500">
                         <span>Settlement Date</span>
                         <span className="font-bold text-black">{new Date().toLocaleString()}</span>
                       </div>
+
+                      <p className="text-[10px] text-gray-400 leading-relaxed font-medium pt-1 text-center border-t border-gray-200/40">
+                        Funds are usually settled instantly. You can check your transaction history ledger any time.
+                      </p>
                     </div>
                   </div>
 
