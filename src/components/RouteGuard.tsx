@@ -31,6 +31,20 @@ const ButtonSpinner = () => (
   </svg>
 );
 
+// Compare semantic-style version strings ("1.2.10" vs "1.2.9"). Returns >0 if a is newer, <0 if older, 0 if equal.
+// Non-numeric segments are ignored safely so malformed versions never crash the update controller.
+const compareAppVersions = (a: string, b: string): number => {
+  const parse = (v: string) => String(v).split(".").map((part) => parseInt(part, 10) || 0);
+  const pa = parse(a);
+  const pb = parse(b);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+};
+
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { user, loading, isPinVerified, userData, updateUserData } = useAuth();
   const { config } = useAppConfig();
@@ -63,6 +77,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   // System-wide update states for real-time versions
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateProgress, setUpdateProgress] = useState(0);
+  // Safety net: guarantees the "SYSTEM UPGRADE IN PROGRESS" overlay can never trap the user
+  const updateOverlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const initializingDeviceRef = useRef(false);
 
@@ -153,41 +169,80 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     if (isMock) return;
     if (typeof window === "undefined" || !config?.appVersion) return;
 
-    const serverVersion = config.appVersion;
+    const serverVersion = String(config.appVersion).trim();
+    if (!serverVersion) return;
+
     const cachedVersion = sessionStorage.getItem("cached_app_version");
 
-    if (cachedVersion === null) {
+    // First visit in this tab, versions match, or the client already has a newer
+    // build than the config advertises (e.g. admin saved an older version string):
+    // never show the upgrade screen for these cases.
+    if (cachedVersion === null || cachedVersion === serverVersion || compareAppVersions(cachedVersion, serverVersion) > 0) {
       sessionStorage.setItem("cached_app_version", serverVersion);
-    } else if (cachedVersion !== serverVersion) {
-      setIsUpdating(true);
+      setIsUpdating(false);
       setUpdateProgress(0);
-
-      const interval = setInterval(() => {
-        setUpdateProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-
-            // Programmatically purge all Cache Storage and Service Worker cached files instantly
-            if ("caches" in window) {
-              caches.keys().then((keys) => {
-                Promise.all(keys.map((key) => caches.delete(key)));
-              });
-            }
-
-            // Clear sessionStorage completely
-            sessionStorage.clear();
-
-            // Set new app version cache and force reload
-            sessionStorage.setItem("cached_app_version", serverVersion);
-            window.location.reload();
-            return 100;
-          }
-          return prev + 5;
-        });
-      }, 150);
-
-      return () => clearInterval(interval);
+      if (updateOverlayTimeoutRef.current) {
+        clearTimeout(updateOverlayTimeoutRef.current);
+        updateOverlayTimeoutRef.current = null;
+      }
+      return;
     }
+
+    // Genuine stale-client case: cached version is older than the server version.
+    setIsUpdating(true);
+    setUpdateProgress(0);
+
+    let completed = false;
+    const finishAndReload = () => {
+      if (completed) return;
+      completed = true;
+      clearInterval(interval);
+      if (updateOverlayTimeoutRef.current) {
+        clearTimeout(updateOverlayTimeoutRef.current);
+        updateOverlayTimeoutRef.current = null;
+      }
+
+      // Programmatically purge all Cache Storage and Service Worker cached files instantly
+      if ("caches" in window) {
+        caches.keys().then((keys) => {
+          Promise.all(keys.map((key) => caches.delete(key)));
+        });
+      }
+
+      // Clear sessionStorage completely, then restore the new version marker so the
+      // post-reload pass matches immediately and cannot re-trigger the overlay.
+      sessionStorage.clear();
+      sessionStorage.setItem("cached_app_version", serverVersion);
+
+      // Keep the overlay visible only until the reload actually fires. If the reload
+      // hasn't happened shortly after being requested, release the overlay so the
+      // user can never be trapped behind "SYSTEM UPGRADE IN PROGRESS".
+      setIsUpdating(false);
+      setUpdateProgress(100);
+      window.location.reload();
+    };
+
+    const interval = setInterval(() => {
+      setUpdateProgress((prev) => {
+        if (prev >= 100) {
+          finishAndReload();
+          return 100;
+        }
+        return prev + 5;
+      });
+    }, 150);
+
+    // Hard safety net: even if progress stalls for any reason, force-complete the
+    // "upgrade" (purge caches + reload) after ~7 seconds — max visible time of the overlay.
+    updateOverlayTimeoutRef.current = setTimeout(finishAndReload, 7000);
+
+    return () => {
+      clearInterval(interval);
+      if (updateOverlayTimeoutRef.current) {
+        clearTimeout(updateOverlayTimeoutRef.current);
+        updateOverlayTimeoutRef.current = null;
+      }
+    };
   }, [config?.appVersion]);
 
   // Detect and verify Flutterwave redirects globally on app startup
