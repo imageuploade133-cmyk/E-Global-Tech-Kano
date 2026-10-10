@@ -664,46 +664,144 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
   // Render high-fidelity professional system update overlay (Ctrl+F5 instant reload powered)
   if (isUpdating) {
+    const upgradePhase =
+      updateProgress >= 100 ? "Finalizing — relaunching app..." :
+      updateProgress >= 70 ? "Clearing old caches & memory..." :
+      updateProgress >= 40 ? "Downloading new application files..." :
+      "Preparing your upgrade...";
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6 z-[9999999] relative">
+      <div className="fixed inset-0 flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#0b0f0d] p-6 z-[9999999]">
+        {/* Ambient background glows */}
+        <div aria-hidden className="pointer-events-none absolute -top-32 -left-32 h-80 w-80 rounded-full bg-[#FC7A00]/20 blur-[110px]" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-32 h-80 w-80 rounded-full bg-emerald-500/15 blur-[110px]" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.04),transparent_60%)]" />
+
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-sm bg-white rounded-[32px] p-6 text-center space-y-6 border border-gray-800/10"
+          initial={{ opacity: 0, y: 24, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          className="relative w-full max-w-md rounded-[32px] border border-white/10 bg-white/[0.06] p-8 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)] backdrop-blur-2xl text-center"
         >
-          <div className="space-y-4">
-            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
-                className="absolute inset-0 rounded-full border-4 border-gray-100 border-t-[#FC7A00] border-r-emerald-500"
-              />
-              <span className="material-symbols-outlined text-[28px] text-[#FC7A00] animate-bounce">sync</span>
-            </div>
-            <h2 className="font-hanken font-black text-lg text-black uppercase tracking-wider leading-none">
-              SYSTEM UPGRADE IN PROGRESS
-            </h2>
-            <p className="font-hanken text-[11px] text-[#FC7A00] font-extrabold uppercase tracking-widest mt-1">
-              Optimizing application files
-            </p>
-            <p className="font-hanken text-xs text-gray-500 leading-relaxed font-semibold">
-              We are applying a direct system-wide update to your application. Caches are being synchronized for instant launch.
-            </p>
+          {/* App badge with dual orbit rings */}
+          <div className="relative mx-auto mb-7 h-24 w-24">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 2.4, ease: "linear" }}
+              className="absolute inset-0 rounded-full border-[3px] border-white/10 border-t-[#FC7A00]"
+            />
+            <motion.div
+              animate={{ rotate: -360 }}
+              transition={{ repeat: Infinity, duration: 3.6, ease: "linear" }}
+              className="absolute inset-2 rounded-full border-[3px] border-white/5 border-b-emerald-400/70"
+            />
+            <motion.div
+              animate={{ scale: [1, 1.06, 1] }}
+              transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
+              className="absolute inset-5 flex items-center justify-center rounded-full bg-white shadow-lg shadow-black/40"
+            >
+              <AppLogo size={34} />
+            </motion.div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
-              <span>Memory Clearance</span>
-              <span className="font-mono text-black font-extrabold">{updateProgress}%</span>
+          {/* Eyebrow chip */}
+          <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[#FC7A00]/30 bg-[#FC7A00]/10 px-3.5 py-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FC7A00] opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-[#FC7A00]" />
+            </span>
+            <span className="font-hanken text-[10px] font-black uppercase tracking-[0.22em] text-[#FFB570]">
+              Please wait
+            </span>
+          </div>
+
+          <h2 className="font-hanken text-2xl font-black uppercase leading-tight tracking-wide text-white sm:text-[26px]">
+            System Upgrade{" "}
+            <span className="bg-gradient-to-r from-[#FC7A00] via-[#ffb26b] to-emerald-400 bg-clip-text text-transparent">
+              In Progress
+            </span>
+          </h2>
+
+          <p className="mx-auto mt-3 max-w-[300px] font-hanken text-[13px] font-semibold leading-relaxed text-white/55">
+            We&apos;re updating E-Global Pay to give you a faster, safer experience. This only takes a few seconds.
+          </p>
+
+          {/* Progress card */}
+          <div className="mt-8 rounded-2xl border border-white/10 bg-black/25 p-5 text-left">
+            <div className="mb-2.5 flex items-end justify-between">
+              <span className="font-hanken text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
+                Installing update
+              </span>
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={updateProgress}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.2 }}
+                  className="font-mono text-xl font-extrabold tabular-nums text-white"
+                >
+                  {updateProgress}
+                  <span className="text-sm text-[#FC7A00]">%</span>
+                </motion.span>
+              </AnimatePresence>
             </div>
-            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+
+            <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-white/10">
               <motion.div
-                className="h-full bg-gradient-to-r from-[#FC7A00] to-emerald-500 rounded-full"
-                style={{ width: `${updateProgress}%` }}
+                className="h-full rounded-full bg-gradient-to-r from-[#FC7A00] via-[#ffb26b] to-emerald-400"
+                animate={{ width: `${Math.max(updateProgress, 4)}%` }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              />
+              {/* moving shine */}
+              <motion.div
+                aria-hidden
+                className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                animate={{ x: ["-120%", "320%"] }}
+                transition={{ repeat: Infinity, duration: 1.4, ease: "linear" }}
               />
             </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <motion.span
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+                className="material-symbols-outlined text-[16px] text-emerald-400"
+                style={{ fontVariationSettings: '"FILL" 1' }}
+              >
+                cloud_download
+              </motion.span>
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={upgradePhase}
+                  initial={{ opacity: 0, y: 3 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -3 }}
+                  transition={{ duration: 0.25 }}
+                  className="font-hanken text-[11px] font-bold uppercase tracking-wider text-white/70"
+                >
+                  {upgradePhase}
+                </motion.p>
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Footer trust row */}
+          <div className="mt-6 flex items-center justify-center gap-2 text-white/35">
+            <span className="material-symbols-outlined text-[14px]">shield</span>
+            <span className="font-hanken text-[10px] font-bold uppercase tracking-[0.18em]">
+              Secure auto-refresh · No action needed
+            </span>
           </div>
         </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="relative mt-6 font-hanken text-[9px] font-bold uppercase tracking-[0.3em] text-white/25 select-none"
+        >
+          E-Global Pay
+        </motion.p>
       </div>
     );
   }
