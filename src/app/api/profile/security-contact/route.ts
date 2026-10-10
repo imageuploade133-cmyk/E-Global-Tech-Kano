@@ -186,7 +186,7 @@ export async function POST(req: Request) {
               </div>
             `,
           });
-          dispatched = result.success;
+          dispatched = result === true;
         } catch {
           dispatched = false;
         }
