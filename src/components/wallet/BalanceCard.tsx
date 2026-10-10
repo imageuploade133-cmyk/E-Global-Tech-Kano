@@ -1514,7 +1514,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       beneficiaryAccountNumber: isBulkMode ? "Multiple" : trfAccount,
       recipientBankCode: trfBank?.code,
       beneficiaryBankCode: trfBank?.code,
-      senderName: String(userData?.name || userData?.displayName || "Account Holder"),
+      senderName: String(userData?.name || userData?.displayName || (userData as any)?.fullName || "Account Holder"),
+      senderAccountNumber: userData?.virtualAccountNumber || userData?.accountNumber || "",
+      senderBankName: userData?.virtualAccountBankName || config.appName || "E-Global Pay",
     };
   };
 
