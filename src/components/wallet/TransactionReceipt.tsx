@@ -108,11 +108,13 @@ export interface Transaction {
 interface TransactionReceiptProps {
   transaction: Transaction | null;
   onClose: () => void;
+  initialShowShareModal?: boolean;
 }
 
 export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   transaction,
   onClose,
+  initialShowShareModal = false,
 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const shareReceiptRef = useRef<HTMLDivElement>(null);
@@ -120,7 +122,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStatusText, setExportStatusText] = useState("");
   const [isExporting, setIsExporting] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(initialShowShareModal);
 
   const { getBillerLogo, getBankLogo, getStoreLogo, banks } = useLogos();
   const { config } = useAppConfig();
@@ -500,9 +502,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     const recAcc = maskAccountNum(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber);
     recipientBankAndAcc = recAcc ? `${recBank} | ${recAcc}` : recBank;
 
-    senderNameDisplay = userFullName || transaction.senderName || config.appName || "E-Global Pay User";
-    const sendBank = config.appName || "E-Global Pay";
-    const sendAcc = maskAccountNum(userData?.virtualAccountNumber || userData?.accountNumber || transaction.senderAccountNumber);
+    senderNameDisplay = displaySenderName || transaction.senderName || userFullName || (userData as any)?.name || (userData as any)?.displayName || config.appName || "E-Global Pay User";
+    const sendBank = resolvedSenderBank !== "Bank" ? resolvedSenderBank : (transaction.senderBankName || userData?.virtualAccountBankName || config.appName || "E-Global Pay");
+    const sendAcc = maskAccountNum(transaction.senderAccountNumber || userData?.virtualAccountNumber || userData?.accountNumber);
     senderBankAndAcc = sendAcc ? `${sendBank} | ${sendAcc}` : sendBank;
   } else if (isBill || isAirtime || isData || isElectricity || isCable || isWaec) {
     txTypeDisplay = isAirtime ? "Airtime Top-up" : isData ? "Data Bundle" : isElectricity ? "Electricity Utility" : isCable ? "Cable TV" : isWaec ? "WAEC Purchase" : "Bill Payment";
