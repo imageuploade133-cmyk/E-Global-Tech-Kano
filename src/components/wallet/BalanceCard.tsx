@@ -4270,9 +4270,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           <button
                             key={num}
                             type="button"
-                            onClick={() => {
-                              if (trfPin.length < 4) setTrfPin((prev) => prev + num);
-                            }}
+                            onClick={() => handleTrfPinPress(num.toString())}
                             className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
                           >
                             {num}
@@ -4287,9 +4285,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (trfPin.length < 4) setTrfPin((prev) => prev + "0");
-                          }}
+                          onClick={() => handleTrfPinPress("0")}
                           className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
                         >
                           0
@@ -4319,7 +4315,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         <button
                           type="button"
                           disabled={trfPin.length < 4}
-                          onClick={() => executeOutwardTransfer(trfPin)}
+                          onClick={() => {
+                            if (trfPin.length === 4) {
+                              if (userData?.is2faOtpEnabled === true) {
+                                setTrfVerifiedPin(trfPin);
+                                setIsTrf2faStage(true);
+                              } else {
+                                executeOutwardTransfer(trfPin);
+                              }
+                            }
+                          }}
                           className="w-full py-2.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-[11px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all active:scale-98"
                         >
                           Authorize via PIN
@@ -4512,8 +4517,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 {trfStep === "confirm" && (
                   <button
                     type="button"
-                    onClick={() => setTrfStep("pin")}
-                    className="w-full py-4 bg-black hover:bg-black/90 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2 border-0"
+                    onClick={() => {
+                      triggerHaptic();
+                      setTrfPin("");
+                      setIsTrf2faStage(false);
+                      setTrfStep("pin");
+                    }}
+                    className="w-full py-4 bg-black hover:bg-black/90 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2 border-0 relative z-30"
                   >
                     <span>Confirm and Proceed</span>
                     <span className="material-symbols-outlined text-[16px] font-black">arrow_forward</span>
