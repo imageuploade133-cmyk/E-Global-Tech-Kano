@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { TwoFactorOtpVerificationView } from "@/components/auth/TwoFactorOtpVerificationView";
 import { getBiometricLabel, getBiometricType, authenticateBiometricDetailed } from "@/lib/biometrics-util";
 import { triggerHaptic } from "@/lib/haptics";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { toast } from "sonner";
 
 interface TransferPinModalProps {
@@ -37,6 +38,9 @@ export const TransferPinModal: React.FC<TransferPinModalProps> = ({
   const [enteredPin, setEnteredPin] = useState<string>("");
   const [is2faStage, setIs2faStage] = useState(false);
   const [verifiedPin, setVerifiedPin] = useState("");
+
+  // Intercept mobile/hardware back button to close ONLY TransferPinModal and return to Confirm Outward Transfer
+  useModalBackHandler(isOpen, onClose, "transfer-pin-authorization-modal");
 
   useEffect(() => {
     if (isOpen) {
