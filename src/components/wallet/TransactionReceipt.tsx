@@ -108,11 +108,13 @@ export interface Transaction {
 interface TransactionReceiptProps {
   transaction: Transaction | null;
   onClose: () => void;
+  initialShowShareModal?: boolean;
 }
 
 export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   transaction,
   onClose,
+  initialShowShareModal = false,
 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const shareReceiptRef = useRef<HTMLDivElement>(null);
@@ -120,7 +122,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStatusText, setExportStatusText] = useState("");
   const [isExporting, setIsExporting] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(initialShowShareModal);
 
   const { getBillerLogo, getBankLogo, getStoreLogo, banks } = useLogos();
   const { config } = useAppConfig();

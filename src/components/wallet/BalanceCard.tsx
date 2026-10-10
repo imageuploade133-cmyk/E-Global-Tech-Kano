@@ -497,6 +497,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferResult, setTransferResult] = useState<{ success: boolean; message: string; reference?: string } | null>(null);
   const [completedTxForReceipt, setCompletedTxForReceipt] = useState<Transaction | null>(null);
+  const [openWithShareModal, setOpenWithShareModal] = useState(false);
   const [isBeneficiarySaved, setIsBeneficiarySaved] = useState(false);
   const [bankSearchQuery, setBankSearchQuery] = useState("");
   const [showTrfBankSelector, setShowTrfBankSelector] = useState(false);
@@ -1473,6 +1474,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setTrfPin("");
       setTransferResult(null);
       setCompletedTxForReceipt(null);
+      setOpenWithShareModal(false);
       setIsBeneficiarySaved(false);
       setBankSearchQuery("");
       setShowTrfBankSelector(false);
@@ -1486,8 +1488,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }, 300);
   };
 
-  const handleViewReceipt = () => {
-    const completedTx: Transaction = {
+  const buildCompletedTransaction = (): Transaction => {
+    return {
       id: transferResult?.reference || `trf-${Date.now()}`,
       reference: transferResult?.reference || `trf-${Date.now()}`,
       type: "TRANSFER",
@@ -1514,7 +1516,18 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       beneficiaryBankCode: trfBank?.code,
       senderName: String(userData?.name || userData?.displayName || "Account Holder"),
     };
+  };
+
+  const handleViewReceipt = () => {
+    const completedTx = buildCompletedTransaction();
     setCompletedTxForReceipt(completedTx);
+    setOpenWithShareModal(false);
+  };
+
+  const handleShareReceiptClick = () => {
+    const completedTx = buildCompletedTransaction();
+    setCompletedTxForReceipt(completedTx);
+    setOpenWithShareModal(true);
   };
 
   const handleSaveBeneficiaryAction = async () => {
@@ -4509,7 +4522,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     </div>
                   </div>
 
-                  {/* Redesigned 4 Action Buttons Bar */}
+                  {/* Completion Action Buttons */}
                   <div className="w-full space-y-2 flex-shrink-0 pt-2 select-none">
                     {/* Row 1: View Receipt & Share Receipt */}
                     <div className="grid grid-cols-2 gap-2">
@@ -4524,7 +4537,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                       <button
                         type="button"
-                        onClick={shareReceiptImage}
+                        onClick={handleShareReceiptClick}
                         className="py-3 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-2xs"
                       >
                         <span className="material-symbols-outlined text-[18px] text-emerald-600">share</span>
@@ -4549,15 +4562,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </span>
                       <span>{isBeneficiarySaved ? "Saved to Beneficiaries" : "Save Beneficiary"}</span>
                     </button>
-
-                    {/* Row 3: Done Action Button */}
-                    <button
-                      type="button"
-                      onClick={handleCloseTransferModal}
-                      className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer hover:brightness-105 active:scale-98 transition-all shadow-sm border-0"
-                    >
-                      Done
-                    </button>
                   </div>
                 </motion.div>
               )}
@@ -4567,9 +4571,17 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             </div>
 
             {/* Static Bottom Action Bar for Transfer Steps */}
-            {isTrfContentReady && (trfStep === "input" || trfStep === "confirm") && (
+            {isTrfContentReady && (trfStep === "input" || trfStep === "confirm" || trfStep === "completion") && (
               <div className="p-5 bg-white border-t border-gray-100 flex-shrink-0 shadow-lg z-20">
-                {trfStep === "input" && (
+                {trfStep === "completion" ? (
+                  <button
+                    type="button"
+                    onClick={handleCloseTransferModal}
+                    className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all shadow-sm border-0"
+                  >
+                    Done
+                  </button>
+                ) : trfStep === "input" ? (
                   !isBulkMode ? (
                     trfAccountName ? (
                       (() => {
@@ -4614,7 +4626,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     type="button"
                     onClick={() => {
                       triggerHaptic();
-                      setIsTrfPinModalOpen(true);
                       setTrfStep("pin");
                       setTrfPin("");
                       setIsTrf2faStage(false);
@@ -5152,7 +5163,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     {completedTxForReceipt && (
       <TransactionReceipt
         transaction={completedTxForReceipt}
-        onClose={() => setCompletedTxForReceipt(null)}
+        initialShowShareModal={openWithShareModal}
+        onClose={() => {
+          setCompletedTxForReceipt(null);
+          setOpenWithShareModal(false);
+        }}
       />
     )}
 
