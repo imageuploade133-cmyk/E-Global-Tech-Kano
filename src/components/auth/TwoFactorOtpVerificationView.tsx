@@ -170,7 +170,7 @@ export function TwoFactorOtpVerificationView({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100050] flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm p-0 sm:p-4 select-none font-hanken">
+      <div className="fixed inset-0 z-[250000] flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm p-0 sm:p-4 select-none font-hanken">
         <div className="absolute inset-0" onClick={() => onCancel && onCancel()} />
 
         <motion.div
