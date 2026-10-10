@@ -11,6 +11,7 @@ import { db } from "@/lib/firebase";
 import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
 import { TierUpgradeDrawerModal } from "@/components/profile/TransferLimitsSection";
+import { AuthorizeTransferModal } from "@/components/wallet/AuthorizeTransferModal";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { AppLogo } from "@/components/AppLogo";
@@ -528,6 +529,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     else if (wizardStep === "ussd-pay") setWizardStep("ussd-bank");
     else if (wizardStep === "transfer-pay") setWizardStep("methods");
   }, "add-money-substep");
+
+  const [isTrfPinModalOpen, setIsTrfPinModalOpen] = useState(false);
 
   useModalBackHandler(isTransferOpen, () => handleCloseTransferModal(), "transfer-modal");
   useModalBackHandler(isTransferOpen && trfStep === "pin", () => setTrfStep("confirm"), "transfer-step-pin");
@@ -4341,9 +4344,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               }
                             }
                           }}
-                          className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer shadow-sm transition-all active:scale-98 border-0"
+                          className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer shadow-sm transition-all active:scale-98 border-0 flex items-center justify-center gap-2"
                         >
-                          Authorize Transfer via PIN
+                          <span className="material-symbols-outlined text-[18px]">lock</span>
+                          <span>PAY NOW</span>
                         </button>
                       </div>
                     </>
@@ -4535,6 +4539,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     type="button"
                     onClick={() => {
                       triggerHaptic();
+                      setIsTrfPinModalOpen(true);
                       setTrfStep("pin");
                       setTrfPin("");
                       setIsTrf2faStage(false);
@@ -5049,6 +5054,23 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       isOpen={isTierUpgradeOpen}
       onClose={() => setIsTierUpgradeOpen(false)}
       onRequestSubmitted={() => setIsTierUpgradeOpen(false)}
+    />
+
+    {/* Dedicated Authorize Transfer Modal */}
+    <AuthorizeTransferModal
+      isOpen={isTrfPinModalOpen}
+      recipientName={isBulkMode ? `${bulkRecipients.length} Batch Recipients` : trfAccountName}
+      bankName={isBulkMode ? "Multiple Banks" : trfBank?.name || "Bank"}
+      accountNumber={isBulkMode ? "Multiple" : trfAccount}
+      amount={parseFloat(trfAmount) || 0}
+      fee={trfFee}
+      totalDebit={trfTotalDebit}
+      walletBalance={balance}
+      onClose={() => setIsTrfPinModalOpen(false)}
+      onExecuteTransfer={(pin, isBiometric) => {
+        setIsTrfPinModalOpen(false);
+        executeOutwardTransfer(pin, isBiometric);
+      }}
     />
 
     </>
