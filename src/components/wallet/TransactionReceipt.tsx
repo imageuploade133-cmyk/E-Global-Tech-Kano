@@ -817,7 +817,16 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
       setExportProgress(95);
       setExportStatusText("Finalizing PDF...");
 
-      if (bridge && typeof bridge.callHandler === "function") {
+      const pdfBlob = pdf.output("blob");
+      const pdfFile = new File([pdfBlob], pdfFileName, { type: "application/pdf" });
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        await navigator.share({
+          files: [pdfFile],
+          title: `${config.appName || "E-Global Pay"} Transaction Receipt`,
+          text: `Transaction Receipt - ${transaction.reference}`,
+        });
+      } else if (bridge && typeof bridge.callHandler === "function") {
         await bridge.callHandler("downloadBase64File", {
           data: pdfDataUri,
           fileName: pdfFileName,
@@ -828,7 +837,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
       }
 
       setExportProgress(100);
-      toast.success("Downloaded HD PDF Receipt!");
+      toast.success("HD PDF Receipt generated successfully!");
     } catch (err) {
       console.error("PDF generation failed:", err);
       toast.error("Failed to generate PDF.");
