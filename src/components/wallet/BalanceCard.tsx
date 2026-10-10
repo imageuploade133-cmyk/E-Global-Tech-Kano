@@ -4117,7 +4117,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         <span className="material-symbols-outlined text-[24px] font-black">gpp_maybe</span>
                       </div>
                       <h4 className="font-hanken font-extrabold text-base text-black mt-2">Confirm Outward Transfer</h4>
-                      <p className="font-hanken text-[11px] text-gray-400">Please review all settlement parameters before final signing.</p>
+                      <p className="font-hanken text-[11px] font-semibold text-red-500">Please review all settlement parameters before final signing.</p>
                     </div>
 
                     {/* Bold structured Summary details (TASK 6) */}
@@ -4184,12 +4184,23 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </div>
                     </div>
 
-                    <div className="p-3 bg-blue-50 border border-blue-100/50 rounded-2xl flex items-start gap-2">
-                      <span className="material-symbols-outlined text-blue-500 text-[18px]">info</span>
-                      <p className="font-hanken text-[11px] text-blue-800 leading-normal">
-                        To authorize this transaction, your secure 4-digit transaction PIN will be requested on the next screen.
+                    <div className="p-3.5 bg-gradient-to-r from-amber-50 to-orange-50/60 border border-amber-200/80 rounded-2xl flex items-center gap-3 shadow-2xs">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-300/40 flex items-center justify-center text-amber-600 shrink-0">
+                        <span className="material-symbols-outlined text-[18px] font-black">lock</span>
+                      </div>
+                      <p className="font-hanken text-[11.5px] font-medium text-amber-950 leading-snug">
+                        To authorize this transaction, your secure <span className="font-extrabold text-amber-900">4-digit transaction PIN</span> will be requested on the next screen.
                       </p>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setTrfStep("pin")}
+                      className="w-full py-4 bg-black hover:bg-black/90 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2 border-0"
+                    >
+                      <span>Confirm and Proceed</span>
+                      <span className="material-symbols-outlined text-[16px] font-black">arrow_forward</span>
+                    </button>
                   </div>
 
                 </motion.div>
