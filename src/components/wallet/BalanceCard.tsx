@@ -4201,7 +4201,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             {/* Static Bottom Action Bar for Transfer Steps */}
             {isTrfContentReady && (trfStep === "input" || trfStep === "confirm" || trfStep === "completion") && (
               <div className="p-5 bg-white border-t border-gray-100 flex-shrink-0 shadow-lg z-20">
-                {trfStep === "completion" ? (
+                {trfStep === "completion" && (
                   <button
                     type="button"
                     onClick={handleCloseTransferModal}
@@ -4209,7 +4209,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   >
                     Done
                   </button>
-                ) : trfStep === "input" ? (
+                )}
+
+                {trfStep === "input" && (
                   !isBulkMode ? (
                     trfAccountName ? (
                       (() => {
