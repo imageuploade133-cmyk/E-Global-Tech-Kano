@@ -4193,14 +4193,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setTrfStep("pin")}
-                      className="w-full py-4 bg-black hover:bg-black/90 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2 border-0"
-                    >
-                      <span>Confirm and Proceed</span>
-                      <span className="material-symbols-outlined text-[16px] font-black">arrow_forward</span>
-                    </button>
                   </div>
 
                 </motion.div>
