@@ -11,7 +11,6 @@ import { db } from "@/lib/firebase";
 import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
 import { TierUpgradeDrawerModal } from "@/components/profile/TransferLimitsSection";
-import { TransferPinModal } from "@/components/wallet/TransferPinModal";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { AppLogo } from "@/components/AppLogo";
@@ -530,9 +529,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     else if (wizardStep === "transfer-pay") setWizardStep("methods");
   }, "add-money-substep");
 
-  const [isTrfPinModalOpen, setIsTrfPinModalOpen] = useState(false);
-
   useModalBackHandler(isTransferOpen, () => handleCloseTransferModal(), "transfer-modal");
+  useModalBackHandler(isTransferOpen && trfStep === "pin", () => setTrfStep("confirm"), "transfer-step-pin");
   useModalBackHandler(isTransferOpen && trfStep === "confirm", () => setTrfStep("input"), "transfer-step-confirm");
   useModalBackHandler(isTransferOpen && showTrfBankSelector, () => setShowTrfBankSelector(false), "bank-selector-modal");
   useModalBackHandler(isTransferOpen && showSaveBeneficiaryPrompt, () => setShowSaveBeneficiaryPrompt(false), "save-beneficiary-prompt");
@@ -3425,7 +3423,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 <div className="w-8" />
               )}
               <h3 className="font-hanken font-bold text-base text-black text-center">
-                Bank Transfer
+                {trfStep === "pin" ? "Authorize Transfer" : "Bank Transfer"}
               </h3>
               <button
                 type="button"
@@ -4200,7 +4198,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </motion.div>
               )}
 
-              {/* STAGE 2.5: Fullscreen PIN Verification Screen (Standardized PIN Pad Design) */}
+              {/* STAGE 2.5: Integrated Authorize Transfer Screen */}
               {trfStep === "pin" && (
                 <motion.div
                   key="trf-pin"
@@ -4222,34 +4220,48 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     />
                   ) : (
                     <>
-                      <div className="space-y-4 w-full">
+                      <div className="space-y-3 w-full">
                         <div className="text-center space-y-1">
-                          <div className="w-12 h-12 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center text-[#FC7A00] mx-auto">
-                            <span className="material-symbols-outlined text-[24px] font-black">lock</span>
+                          <div className="w-10 h-10 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center text-[#FC7A00] mx-auto shrink-0">
+                            <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>lock</span>
                           </div>
-                          <h4 className="font-hanken font-extrabold text-base text-black mt-2">Enter Transaction PIN</h4>
-                          <p className="font-hanken text-[11px] text-gray-400">Authorize your transfer securely using your 4-digit PIN.</p>
+                          <h4 className="font-hanken font-extrabold text-sm text-black">Enter Transaction PIN</h4>
+                          <p className="font-hanken text-[11px] text-gray-500 font-medium">Enter your 4-digit PIN or use biometrics to authorize transfer.</p>
                         </div>
 
-                        {/* Displaying user Balance and amount user wants to Transfer inside UI card */}
-                        <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-2 font-hanken text-left">
-                          <div className="flex justify-between text-xs font-bold text-gray-700">
+                        {/* Displaying concise transfer summary card */}
+                        <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-3.5 space-y-2 font-hanken text-left text-xs shadow-xs">
+                          <div className="flex justify-between items-center font-bold text-gray-700">
                             <span>Amount to Transfer:</span>
-                            <span className="font-mono font-black text-[#E11D48]">
+                            <span className="font-mono font-black text-[#E11D48] text-sm">
                               ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
                             </span>
                           </div>
-                          <div className="flex justify-between text-xs font-semibold text-gray-500 border-t border-gray-200/60 pt-2">
-                            <span>My Wallet Balance:</span>
-                            <span className="font-mono text-black font-extrabold">
+                          <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
+                            <span className="text-gray-500 font-semibold">Recipient:</span>
+                            <span className="font-extrabold text-black uppercase truncate max-w-[180px]">
+                              {isBulkMode ? `${bulkRecipients.length} Batch Recipients` : trfAccountName}
+                            </span>
+                          </div>
+                          {!isBulkMode && trfBank && (
+                            <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
+                              <span className="text-gray-500 font-semibold">Destination Bank:</span>
+                              <span className="font-semibold text-gray-800 uppercase truncate max-w-[180px]">
+                                {trfBank.name} ({trfAccount})
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
+                            <span className="text-gray-500 font-semibold">My Wallet Balance:</span>
+                            <span className="font-mono font-black text-black">
                               ₦{balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
                             </span>
                           </div>
                         </div>
 
                         {/* 4 Box PIN Indicators */}
-                        <div className="space-y-2 text-center py-1">
-                          <div className="flex justify-center gap-2 pt-1">
+                        <div className="space-y-1 text-center py-1">
+                          <div className="flex justify-center gap-2">
                             {[0, 1, 2, 3].map((idx) => (
                               <div
                                 key={idx}
@@ -4266,53 +4278,55 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         </div>
                       </div>
 
-                      {/* Standardized Transaction Keypad Grid */}
-                      <div className="grid grid-cols-3 gap-2.5 pt-1 w-full max-w-xs mx-auto">
+                      {/* Keypad Grid */}
+                      <div className="grid grid-cols-3 gap-2 pt-1 w-full max-w-xs mx-auto">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                           <button
                             key={num}
                             type="button"
                             onClick={() => handleTrfPinPress(num.toString())}
-                            className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                            className="py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
                           >
                             {num}
                           </button>
                         ))}
                         <button
                           type="button"
-                          onClick={() => setTrfPin("")}
-                          className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-pointer active:scale-95 transition-all"
+                          onClick={() => { triggerHaptic(); setTrfPin(""); }}
+                          className="py-3 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-pointer active:scale-95 transition-all"
                         >
                           CLEAR
                         </button>
                         <button
                           type="button"
                           onClick={() => handleTrfPinPress("0")}
-                          className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                          className="py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
                         >
                           0
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleTrfPinDelete()}
-                          className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 cursor-pointer active:scale-95 transition-all flex items-center justify-center"
+                          onClick={handleTrfPinDelete}
+                          className="py-3 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 cursor-pointer active:scale-95 transition-all flex items-center justify-center"
                         >
                           <span className="material-symbols-outlined text-[20px]">backspace</span>
                         </button>
                       </div>
 
-                      {/* Biometric Transfer or PIN Authorize Transfer button */}
-                      <div className="w-full max-w-xs mx-auto pt-1 pb-2 space-y-1.5">
-                        <button
-                          type="button"
-                          onClick={handleBiometricTransferAuth}
-                          className="w-full py-2.5 bg-[#07B038] hover:bg-[#058a2f] text-white text-[11px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all active:scale-98 flex items-center justify-center gap-1.5"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">
-                            {getBiometricType() === "faceid" ? "face_6" : "fingerprint"}
-                          </span>
-                          <span>Authorize via {getBiometricLabel()}</span>
-                        </button>
+                      {/* Action buttons */}
+                      <div className="w-full max-w-xs mx-auto pt-1 pb-2 space-y-2">
+                        {(userData?.isBiometricTransferEnabled === true || userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true) && (
+                          <button
+                            type="button"
+                            onClick={handleBiometricTransferAuth}
+                            className="w-full py-3 bg-[#07B038] hover:bg-[#058a2f] text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all active:scale-98 flex items-center justify-center gap-2 border-0"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              {getBiometricType() === "faceid" ? "face_6" : "fingerprint"}
+                            </span>
+                            <span>Authorize via {getBiometricLabel()}</span>
+                          </button>
+                        )}
 
                         <button
                           type="button"
@@ -4327,9 +4341,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               }
                             }
                           }}
-                          className="w-full py-2.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-[11px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all active:scale-98"
+                          className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer shadow-sm transition-all active:scale-98 border-0"
                         >
-                          Authorize via PIN
+                          Authorize Transfer via PIN
                         </button>
                       </div>
                     </>
@@ -4521,7 +4535,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     type="button"
                     onClick={() => {
                       triggerHaptic();
-                      setIsTrfPinModalOpen(true);
+                      setTrfStep("pin");
+                      setTrfPin("");
+                      setIsTrf2faStage(false);
                     }}
                     className="w-full py-4 bg-black hover:bg-black/90 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2 border-0 relative z-30"
                   >
@@ -5035,22 +5051,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       onRequestSubmitted={() => setIsTierUpgradeOpen(false)}
     />
 
-    {/* Dedicated Full-Screen Transfer PIN Verification Modal */}
-    <TransferPinModal
-      isOpen={isTrfPinModalOpen}
-      recipientName={isBulkMode ? `${bulkRecipients.length} Batch Recipients` : trfAccountName}
-      bankName={isBulkMode ? "Multiple Banks" : trfBank?.name || "Bank"}
-      accountNumber={isBulkMode ? "Multiple" : trfAccount}
-      amount={parseFloat(trfAmount) || 0}
-      fee={trfFee}
-      totalDebit={trfTotalDebit}
-      walletBalance={balance}
-      onClose={() => setIsTrfPinModalOpen(false)}
-      onExecuteTransfer={(pin, isBiometric) => {
-        setIsTrfPinModalOpen(false);
-        executeOutwardTransfer(pin, isBiometric);
-      }}
-    />
     </>
   );
 };

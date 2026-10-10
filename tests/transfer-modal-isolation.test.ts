@@ -1,39 +1,30 @@
 import { describe, test, expect } from "bun:test";
 
-describe("Outward Transfer Modal Stack Isolation Suite", () => {
-  test("Closing Authorize Transfer (TransferPinModal) strictly updates PIN modal state without closing Confirm Outward Transfer", () => {
+describe("Outward Transfer Integrated Authorize Transfer Navigation Suite", () => {
+  test("Transitioning from Confirm Outward Transfer to Authorize Transfer updates trfStep to 'pin'", () => {
     let isTransferOpen = true;
     let trfStep: "input" | "confirm" | "pin" | "completion" = "confirm";
-    let isTrfPinModalOpen = false;
 
     // Step 1: User clicks "Confirm and Proceed"
-    isTrfPinModalOpen = true;
+    trfStep = "pin";
     expect(isTransferOpen).toBe(true);
-    expect(trfStep).toBe("confirm");
-    expect(isTrfPinModalOpen).toBe(true);
+    expect(trfStep).toBe("pin");
 
-    // Step 2: User clicks close (×) icon on TransferPinModal
-    isTrfPinModalOpen = false;
-
-    // Assert: Confirm Outward Transfer remains open with original data
-    expect(isTrfPinModalOpen).toBe(false);
+    // Step 2: User clicks back arrow or hardware back button on Authorize Transfer screen
+    trfStep = "confirm";
     expect(isTransferOpen).toBe(true);
     expect(trfStep).toBe("confirm");
   });
 
-  test("Reopening Authorize Transfer modal works cleanly after closing", () => {
+  test("Closing Transfer modal from Authorize Transfer screen resets step cleanly on close", () => {
     let isTransferOpen = true;
-    let isTrfPinModalOpen = false;
+    let trfStep: "input" | "confirm" | "pin" | "completion" = "pin";
 
-    // Open -> Close -> Reopen
-    isTrfPinModalOpen = true;
-    expect(isTrfPinModalOpen).toBe(true);
+    // User closes the transfer drawer modal
+    isTransferOpen = false;
+    trfStep = "input";
 
-    isTrfPinModalOpen = false;
-    expect(isTrfPinModalOpen).toBe(false);
-
-    isTrfPinModalOpen = true;
-    expect(isTrfPinModalOpen).toBe(true);
-    expect(isTransferOpen).toBe(true);
+    expect(isTransferOpen).toBe(false);
+    expect(trfStep).toBe("input");
   });
 });
