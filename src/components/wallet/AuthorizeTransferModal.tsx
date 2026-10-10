@@ -181,16 +181,32 @@ export const AuthorizeTransferModal: React.FC<AuthorizeTransferModalProps> = ({
 
                     {/* Concise Summary Card */}
                     <div className="w-full bg-gray-50 border border-gray-200/80 rounded-2xl p-3.5 space-y-2 font-hanken text-left text-xs shadow-xs">
-                      <div className="flex justify-between items-center font-bold text-gray-700">
-                        <span>Amount to Transfer:</span>
+                      <div className="flex justify-between items-center font-semibold text-gray-600">
+                        <span>Transfer Amount:</span>
+                        <span className="font-mono font-bold text-gray-900">
+                          ₦{amount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
+                        <span className="text-gray-500 font-semibold">Transfer Fee:</span>
+                        <span className="font-mono font-bold text-gray-700">
+                          {fee > 0 ? `₦${fee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : "₦0.00 (Free)"}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 font-bold text-gray-800">
+                        <span>Total Debit Amount:</span>
                         <span className="font-mono font-black text-[#E11D48] text-sm">
                           ₦{totalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
                         </span>
                       </div>
+
                       <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
                         <span className="text-gray-500 font-semibold">Recipient:</span>
                         <span className="font-extrabold text-black uppercase truncate max-w-[180px]">{recipientName}</span>
                       </div>
+
                       {bankName && (
                         <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
                           <span className="text-gray-500 font-semibold">Destination Bank:</span>
@@ -199,6 +215,7 @@ export const AuthorizeTransferModal: React.FC<AuthorizeTransferModalProps> = ({
                           </span>
                         </div>
                       )}
+
                       <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
                         <span className="text-gray-500 font-semibold">My Wallet Balance:</span>
                         <span className="font-mono font-black text-black">

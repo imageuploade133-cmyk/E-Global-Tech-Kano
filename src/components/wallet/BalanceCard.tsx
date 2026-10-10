@@ -4234,18 +4234,34 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                         {/* Displaying concise transfer summary card */}
                         <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-3.5 space-y-2 font-hanken text-left text-xs shadow-xs">
-                          <div className="flex justify-between items-center font-bold text-gray-700">
-                            <span>Amount to Transfer:</span>
+                          <div className="flex justify-between items-center font-semibold text-gray-600">
+                            <span>Transfer Amount:</span>
+                            <span className="font-mono font-bold text-gray-900">
+                              ₦{(parseFloat(trfAmount) || 0).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
+                            <span className="text-gray-500 font-semibold">Transfer Fee:</span>
+                            <span className="font-mono font-bold text-gray-700">
+                              {trfFee > 0 ? `₦${trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : "₦0.00 (Free)"}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 font-bold text-gray-800">
+                            <span>Total Debit Amount:</span>
                             <span className="font-mono font-black text-[#E11D48] text-sm">
                               ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
                             </span>
                           </div>
+
                           <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
                             <span className="text-gray-500 font-semibold">Recipient:</span>
                             <span className="font-extrabold text-black uppercase truncate max-w-[180px]">
                               {isBulkMode ? `${bulkRecipients.length} Batch Recipients` : trfAccountName}
                             </span>
                           </div>
+
                           {!isBulkMode && trfBank && (
                             <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
                               <span className="text-gray-500 font-semibold">Destination Bank:</span>
@@ -4254,6 +4270,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               </span>
                             </div>
                           )}
+
                           <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
                             <span className="text-gray-500 font-semibold">My Wallet Balance:</span>
                             <span className="font-mono font-black text-black">
