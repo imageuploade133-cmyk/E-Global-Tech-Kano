@@ -2389,14 +2389,18 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   // Filter bank query
-  const filteredBanks = Array.isArray(banksList) ? banksList.filter(b =>
-    b.name && b.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ) : [];
+  const filteredBanks = Array.isArray(banksList)
+    ? banksList.filter((bank) => {
+        return Boolean(bank.name) && bank.name.toLowerCase().includes(searchQuery.toLowerCase());
+      })
+    : [];
 
   // Filter bank query (Outward transfer)
-  const filteredTrfBanks = Array.isArray(banksList) ? banksList.filter(b =>
-    b.name && b.name.toLowerCase().includes(bankSearchQuery.toLowerCase())
-  ) : [];
+  const filteredTrfBanks = Array.isArray(banksList)
+    ? banksList.filter((bank) => {
+        return Boolean(bank.name) && bank.name.toLowerCase().includes(bankSearchQuery.toLowerCase());
+      })
+    : [];
 
   return (
     <>
