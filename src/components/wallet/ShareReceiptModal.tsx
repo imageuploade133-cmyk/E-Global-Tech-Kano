@@ -42,10 +42,13 @@ export const ShareReceiptModal: React.FC<ShareReceiptModalProps> = ({
 }) => {
   const shareReceiptRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
+  const [loadingText, setLoadingText] = useState("Processing...");
+  const [isPdfDrawerOpen, setIsPdfDrawerOpen] = useState(false);
   const { config } = useAppConfig();
 
-  // Intercept mobile/hardware back button to close ONLY ShareReceiptModal
-  useModalBackHandler(isOpen, onClose, "share-receipt-modal");
+  // Intercept mobile/hardware back button
+  useModalBackHandler(isOpen && !isPdfDrawerOpen, onClose, "share-receipt-modal");
+  useModalBackHandler(isPdfDrawerOpen, () => setIsPdfDrawerOpen(false), "pdf-options-drawer");
 
   if (!isOpen || !transaction) return null;
 
@@ -53,7 +56,7 @@ export const ShareReceiptModal: React.FC<ShareReceiptModalProps> = ({
     if (!shareReceiptRef.current) return null;
     try {
       const canvas = await html2canvas(shareReceiptRef.current, {
-        scale: 2,
+        scale: 2.5,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#ffffff",
@@ -68,18 +71,19 @@ export const ShareReceiptModal: React.FC<ShareReceiptModalProps> = ({
     }
   };
 
-  const handleShareImageFromModal = async () => {
+  const handleShareImage = async () => {
     if (generating) return;
     setGenerating(true);
+    setLoadingText("Generating HD Image...");
     toast.loading("Generating shareable receipt image...", { id: "share-image" });
 
     try {
       const blob = await generateReceiptBlob();
       toast.dismiss("share-image");
-      setGenerating(false);
 
       if (!blob) {
         toast.error("Failed to generate receipt image.");
+        setGenerating(false);
         return;
       }
 
@@ -111,42 +115,84 @@ export const ShareReceiptModal: React.FC<ShareReceiptModalProps> = ({
       }
     } catch (err: any) {
       toast.dismiss("share-image");
-      setGenerating(false);
       if (err?.name !== "AbortError") {
         console.warn("Share error:", err);
         toast.error("Unable to share receipt image.");
       }
+    } finally {
+      setGenerating(false);
     }
   };
 
-  const handleDownloadPDFFromModal = async () => {
+  const handlePdfAction = async (action: "share" | "download") => {
+    setIsPdfDrawerOpen(false);
     if (generating) return;
     setGenerating(true);
-    toast.loading("Exporting PDF receipt...", { id: "export-pdf" });
+    setLoadingText(action === "share" ? "Preparing PDF for sharing..." : "Exporting PDF file...");
+    toast.loading(action === "share" ? "Preparing PDF for sharing..." : "Generating PDF receipt...", { id: "pdf-action" });
 
     try {
       const blob = await generateReceiptBlob();
-      toast.dismiss("export-pdf");
-      setGenerating(false);
-
       if (!blob) {
-        toast.error("Failed to export PDF receipt.");
+        toast.dismiss("pdf-action");
+        toast.error("Failed to compile receipt graphics.");
+        setGenerating(false);
         return;
       }
 
+      const { jsPDF } = await import("jspdf");
+      const imgDataUri = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const imgWidth = 170;
+      const imgHeight = (280 * imgWidth) / 190;
+      const xPos = (pdfWidth - imgWidth) / 2;
+
+      pdf.addImage(imgDataUri, "PNG", xPos, 15, imgWidth, imgHeight, undefined, "FAST");
+
       const ref = transaction.reference || "transfer";
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `Receipt_${ref}.png`;
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.success("Receipt saved successfully!");
-    } catch (err) {
-      toast.dismiss("export-pdf");
+      const pdfFileName = `Receipt_${ref}.pdf`;
+
+      toast.dismiss("pdf-action");
+
+      if (action === "share") {
+        const pdfBlob = pdf.output("blob");
+        const pdfFile = new File([pdfBlob], pdfFileName, { type: "application/pdf" });
+
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+          await navigator.share({
+            files: [pdfFile],
+            title: "Transaction Receipt PDF",
+            text: `Transaction Receipt - ${ref}`,
+          });
+          toast.success("PDF shared successfully!");
+        } else if (navigator.share) {
+          await navigator.share({
+            title: "Transaction Receipt",
+            text: `Transaction Receipt - ${ref}\nAmount: ${currencySymbol}${displayAmount.toLocaleString()}`,
+          });
+          toast.success("Receipt details shared!");
+        } else {
+          pdf.save(pdfFileName);
+          toast.success("PDF downloaded successfully!");
+        }
+      } else {
+        pdf.save(pdfFileName);
+        toast.success("PDF downloaded successfully!");
+      }
+    } catch (err: any) {
+      toast.dismiss("pdf-action");
+      if (err?.name !== "AbortError") {
+        console.error("PDF action error:", err);
+        toast.error("Failed to process PDF file.");
+      }
+    } finally {
       setGenerating(false);
-      console.error("PDF export error:", err);
-      toast.error("Failed to export receipt.");
     }
   };
 
@@ -159,6 +205,32 @@ export const ShareReceiptModal: React.FC<ShareReceiptModalProps> = ({
           exit={{ opacity: 0, y: 30 }}
           className="fixed inset-0 w-full h-full bg-[#F5F6F8] z-[100005] flex flex-col select-none overflow-hidden text-black font-hanken"
         >
+          {/* Loading Processing Overlay */}
+          <AnimatePresence>
+            {generating && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-black/50 backdrop-blur-xs z-[100010] flex flex-col items-center justify-center p-6 text-center"
+              >
+                <div className="bg-white rounded-3xl p-6 shadow-2xl flex flex-col items-center space-y-3 max-w-xs w-full">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-[#00B96B]">
+                    <span className="material-symbols-outlined text-[28px] animate-spin">
+                      progress_activity
+                    </span>
+                  </div>
+                  <h4 className="font-hanken font-extrabold text-sm text-black">
+                    Processing Receipt
+                  </h4>
+                  <p className="font-hanken text-xs font-semibold text-gray-500">
+                    {loadingText}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Modal Top Navigation */}
           <div className="safe-top bg-[#F5F6F8] px-5 py-4 flex items-center justify-between shrink-0 border-b border-gray-200/50">
             <button
@@ -285,7 +357,7 @@ export const ShareReceiptModal: React.FC<ShareReceiptModalProps> = ({
             <button
               type="button"
               disabled={generating}
-              onClick={handleShareImageFromModal}
+              onClick={handleShareImage}
               className="flex-1 py-3 flex items-center justify-center gap-2 text-[#00B96B] font-bold text-sm hover:bg-gray-50 active:scale-95 transition-all rounded-xl cursor-pointer disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-lg font-bold">image</span>
@@ -297,13 +369,88 @@ export const ShareReceiptModal: React.FC<ShareReceiptModalProps> = ({
             <button
               type="button"
               disabled={generating}
-              onClick={handleDownloadPDFFromModal}
+              onClick={() => setIsPdfDrawerOpen(true)}
               className="flex-1 py-3 flex items-center justify-center gap-2 text-[#00B96B] font-bold text-sm hover:bg-gray-50 active:scale-95 transition-all rounded-xl cursor-pointer disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-lg font-bold">picture_as_pdf</span>
-              <span>Save PDF</span>
+              <span>Save as PDF</span>
             </button>
           </div>
+
+          {/* Bottom PDF Options Drawer Modal */}
+          <AnimatePresence>
+            {isPdfDrawerOpen && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsPdfDrawerOpen(false)}
+                  className="fixed inset-0 bg-black/50 backdrop-blur-xs z-[100008]"
+                />
+                <motion.div
+                  initial={{ y: "100%" }}
+                  animate={{ y: 0 }}
+                  exit={{ y: "100%" }}
+                  transition={{ type: "spring", damping: 28, stiffness: 300 }}
+                  className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 z-[100009] space-y-4 max-w-md mx-auto shadow-2xl"
+                >
+                  <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto" />
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[#00B96B] text-xl font-bold">
+                        picture_as_pdf
+                      </span>
+                      <h3 className="font-hanken font-bold text-base text-black">PDF Export Options</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsPdfDrawerOpen(false)}
+                      className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-base font-bold">close</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handlePdfAction("share")}
+                      className="w-full py-3.5 px-4 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-2xl flex items-center justify-between text-emerald-800 font-extrabold text-xs uppercase tracking-wider cursor-pointer active:scale-98 transition-all shadow-2xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-300/40 flex items-center justify-center text-[#00B96B]">
+                          <span className="material-symbols-outlined text-lg font-bold">share</span>
+                        </div>
+                        <div className="text-left">
+                          <span className="block text-black font-extrabold text-xs uppercase">Share as PDF</span>
+                          <span className="text-[10.5px] font-medium text-gray-500 lowercase">Share PDF directly via apps / WhatsApp</span>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-gray-400 text-lg">chevron_right</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handlePdfAction("download")}
+                      className="w-full py-3.5 px-4 bg-gray-50 hover:bg-gray-100 border border-gray-200/80 rounded-2xl flex items-center justify-between text-black font-extrabold text-xs uppercase tracking-wider cursor-pointer active:scale-98 transition-all shadow-2xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-gray-200/60 border border-gray-300/40 flex items-center justify-center text-gray-700">
+                          <span className="material-symbols-outlined text-lg font-bold">download</span>
+                        </div>
+                        <div className="text-left">
+                          <span className="block text-black font-extrabold text-xs uppercase">Download as PDF</span>
+                          <span className="text-[10.5px] font-medium text-gray-500 lowercase">Save PDF file directly to device storage</span>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-gray-400 text-lg">chevron_right</span>
+                    </button>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>
