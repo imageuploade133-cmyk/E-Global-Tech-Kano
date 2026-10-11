@@ -414,6 +414,13 @@ export default function CpanelVirtualAccountsPage() {
                     <td className="p-4 text-right">
                       <CpanelActionDropdown
                         actions={[
+                          {
+                            label: "Inspect / Replace Account",
+                            icon: "sync_alt",
+                            onClick: () => {
+                              window.location.href = `/cpanel/virtual-account`;
+                            },
+                          },
                           item.isActive
                             ? {
                                 label: "Deactivate Virtual Account",
