@@ -43,6 +43,7 @@ export async function GET(req: Request) {
       storeOrdersRes,
       storeReviewsRes,
       deleteRequestsRes,
+      trnIssuesRes,
     ] = await Promise.allSettled([
       // 1. KYC Submissions Pending
       adminDb.collection("kyc_submissions").where("status", "in", ["PENDING", "PENDING_REVIEW"]).count().get(),
@@ -66,6 +67,8 @@ export async function GET(req: Request) {
       adminDb.collection("store_reviews").where("isViewed", "==", false).count().get(),
       // 11. Account Deletion Requests Pending
       adminDb.collection("users").where("deleteRequested", "==", true).count().get(),
+      // 12. Transaction Issues Pending
+      adminDb.collection("transaction_issues").where("status", "==", "PENDING").count().get(),
     ]);
 
     // Fallback handlers for count queries
@@ -101,6 +104,7 @@ export async function GET(req: Request) {
       store_orders: storeOrdersRes.status === "fulfilled" ? storeOrdersRes.value.data().count : 0,
       store_reviews: storeReviewsRes.status === "fulfilled" ? storeReviewsRes.value.data().count : 0,
       delete_account: deleteRequestsRes.status === "fulfilled" ? deleteRequestsRes.value.data().count : 0,
+      trn_issues: trnIssuesRes.status === "fulfilled" ? trnIssuesRes.value.data().count : 0,
     };
 
     sidebarCountsCache = {
