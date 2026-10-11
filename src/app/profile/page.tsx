@@ -388,7 +388,7 @@ export default function ProfilePage() {
       toast.dismiss("delete-req");
 
       if (res.ok && data.success) {
-        toast.success(data.message || "Account deletion request submitted!");
+        toast.success("Dear customer your request have been subited action will be taking ASAP Thanks");
         setIsDeleteModalOpen(false);
         setDeleteReason("");
         if (updateUserData) {

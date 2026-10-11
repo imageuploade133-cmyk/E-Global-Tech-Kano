@@ -116,7 +116,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Your account deletion request has been submitted to CPanel Administrators.",
+      message: "Dear customer your request have been subited action will be taking ASAP Thanks",
     });
   } catch (err: any) {
     console.error("[Delete Request API Error]:", err);

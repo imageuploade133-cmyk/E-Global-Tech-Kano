@@ -11,6 +11,8 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const searchQuery = (searchParams.get("search") || searchParams.get("q") || "").trim().toLowerCase();
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "10", 10)));
 
     // Fetch all deletion requests or users who requested deletion
     const usersSnap = await adminDb.collection("users").get();
@@ -65,10 +67,19 @@ export async function GET(req: Request) {
     // Sort newest deletion requests first
     requests.sort((a, b) => new Date(b.deleteRequestedAt).getTime() - new Date(a.deleteRequestedAt).getTime());
 
+    const totalCount = requests.length;
+    const totalPages = Math.ceil(totalCount / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginatedRequests = requests.slice(startIndex, startIndex + limit);
+
     return NextResponse.json({
       success: true,
-      requests,
-      count: requests.length,
+      requests: paginatedRequests,
+      count: totalCount,
+      page,
+      limit,
+      totalPages,
+      hasMore: page < totalPages,
     });
   } catch (err: any) {
     console.error("[Admin Delete Account GET Error]:", err.message);
