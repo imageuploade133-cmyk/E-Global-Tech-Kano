@@ -218,6 +218,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (docSnap.exists()) {
             const data = docSnap.data() as UserData;
 
+            // Banned Account Guard Check
+            if (data.isBanned === true || data.status === "BANNED" || data.status === "banned") {
+              console.warn("[Banned Account] User account is banned. Executing signout...");
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("active_session_id");
+                localStorage.removeItem("active_fcm_token");
+                sessionStorage.removeItem("active_fcm_token");
+              }
+              handleAppSignOut(null);
+              return;
+            }
+
             // Single Active Device / Session Revocation Check
             const localSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
             const remoteActiveSessionId = data.activeSessionId as string | undefined;

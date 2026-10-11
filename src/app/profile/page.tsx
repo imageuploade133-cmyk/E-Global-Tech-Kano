@@ -3,7 +3,7 @@
 import { triggerHaptic } from "@/lib/haptics";
 
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -67,6 +67,9 @@ export default function ProfilePage() {
 
   // Modal / Drawer States
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [isSubmittingDelete, setIsSubmittingDelete] = useState(false);
 
   // Security Toggles State
   const isPinRequired = userData?.isPinRequired !== false;
@@ -345,6 +348,89 @@ export default function ProfilePage() {
     await handleAppSignOut(router);
   };
 
+  const handleRequestAccountDeletion = async () => {
+    setIsSubmittingDelete(true);
+    toast.loading("Submitting account deletion request...", { id: "delete-req" });
+
+    try {
+      let idToken = "";
+      if (user && typeof user.getIdToken === "function") {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/profile/delete-request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({
+          action: "request",
+          reason: deleteReason,
+        }),
+      });
+
+      const data = await res.json();
+      toast.dismiss("delete-req");
+
+      if (res.ok && data.success) {
+        toast.success(data.message || "Account deletion request submitted!");
+        setIsDeleteModalOpen(false);
+        setDeleteReason("");
+        if (updateUserData) {
+          updateUserData({ deleteRequested: true });
+        }
+      } else {
+        toast.error(data.error || "Failed to submit deletion request.");
+      }
+    } catch {
+      toast.dismiss("delete-req");
+      toast.error("Network error submitting request.");
+    } finally {
+      setIsSubmittingDelete(false);
+    }
+  };
+
+  const handleCancelAccountDeletion = async () => {
+    setIsSubmittingDelete(true);
+    toast.loading("Canceling account deletion request...", { id: "cancel-delete" });
+
+    try {
+      let idToken = "";
+      if (user && typeof user.getIdToken === "function") {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/profile/delete-request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({
+          action: "cancel",
+        }),
+      });
+
+      const data = await res.json();
+      toast.dismiss("cancel-delete");
+
+      if (res.ok && data.success) {
+        toast.success("Account deletion request canceled!");
+        if (updateUserData) {
+          updateUserData({ deleteRequested: false });
+        }
+      } else {
+        toast.error(data.error || "Failed to cancel request.");
+      }
+    } catch {
+      toast.dismiss("cancel-delete");
+      toast.error("Network error canceling request.");
+    } finally {
+      setIsSubmittingDelete(false);
+    }
+  };
+
   return (
     <>
       <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
@@ -413,8 +499,8 @@ export default function ProfilePage() {
           {/* Section: User Phone Number Management */}
           <PhoneNumberSection />
 
-          {/* Section: Destructive Actions (Logout) */}
-          <section className="pt-2">
+          {/* Section: Destructive Actions (Logout & Delete Request) */}
+          <section className="pt-2 space-y-3">
             <button
               onClick={() => { triggerHaptic(); setIsLogoutOpen(true); }}
               className="w-full py-4 bg-[#dc3545]/10 hover:bg-[#dc3545]/15 border border-[#dc3545]/20 text-[#dc3545] rounded-2xl flex items-center justify-center gap-2 font-bold uppercase tracking-widest text-xs active:scale-95 transition-all cursor-pointer"
@@ -422,6 +508,35 @@ export default function ProfilePage() {
               <span className="material-symbols-outlined text-[20px]">logout</span>
               Sign Out from Device
             </button>
+
+            {userData?.deleteRequested ? (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-2 text-center">
+                <div className="flex items-center justify-center gap-1.5 text-amber-800 font-extrabold text-xs uppercase tracking-wider">
+                  <span className="material-symbols-outlined text-base">warning</span>
+                  <span>Account Deletion Requested</span>
+                </div>
+                <p className="text-[11px] text-amber-700 font-medium">
+                  Your deletion request is currently under review by CPanel Administrators.
+                </p>
+                <button
+                  type="button"
+                  disabled={isSubmittingDelete}
+                  onClick={handleCancelAccountDeletion}
+                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold uppercase text-[10px] tracking-wider transition-all cursor-pointer disabled:opacity-50"
+                >
+                  Cancel Deletion Request
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { triggerHaptic(); setIsDeleteModalOpen(true); }}
+                className="w-full py-3.5 bg-gray-100 hover:bg-red-50 hover:border-red-200 text-gray-600 hover:text-red-600 border border-gray-200 rounded-2xl flex items-center justify-center gap-2 font-extrabold uppercase tracking-widest text-xs active:scale-95 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                Request Delete Account
+              </button>
+            )}
           </section>
         </motion.div>
       </main>
@@ -440,6 +555,89 @@ export default function ProfilePage() {
         onClose={() => setIsLogoutOpen(false)}
         onConfirm={handleLogoutConfirm}
       />
+
+      {/* Account Deletion Request Drawer Modal */}
+      <AnimatePresence>
+        {isDeleteModalOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDeleteModalOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100000]"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-3xl p-6 z-[100001] space-y-4 font-hanken shadow-2xl text-black"
+            >
+              <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto" />
+
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                <div className="flex items-center gap-2 text-red-600">
+                  <span className="material-symbols-outlined text-2xl font-bold">delete_forever</span>
+                  <h3 className="font-extrabold text-base text-black">Request Delete Account</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-base font-bold">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-gray-600 leading-relaxed">
+                  Submitting an account deletion request will notify CPanel Administrators to inspect and process your wallet termination.
+                </p>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">
+                    Reason for deletion (Optional)
+                  </label>
+                  <textarea
+                    value={deleteReason}
+                    onChange={(e) => setDeleteReason(e.target.value)}
+                    placeholder="Tell us why you want to delete your account..."
+                    className="w-full h-24 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold outline-none focus:border-red-500 transition-all resize-none"
+                  />
+                </div>
+
+                <div className="p-3 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-2.5 text-red-800 text-[11px] font-semibold">
+                  <span className="material-symbols-outlined text-lg shrink-0">info</span>
+                  <span>Once requested, administrators will process account closure and settle any remaining balance.</span>
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingDelete}
+                  onClick={handleRequestAccountDeletion}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  {isSubmittingDelete ? (
+                    <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                  ) : (
+                    <span>Submit Request</span>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <BottomNav />
     </>

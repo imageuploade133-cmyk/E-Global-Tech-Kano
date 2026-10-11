@@ -161,6 +161,18 @@ export async function POST(req: Request) {
     const userRef = adminDb.collection("users").doc(uid);
     const adminUserRef = adminDb.collection("admin_users").doc(uid);
 
+    // Check if user account is banned or suspended globally
+    const userDocCheck = await userRef.get();
+    if (userDocCheck.exists) {
+      const uDataCheck = userDocCheck.data() || {};
+      if (uDataCheck.isBanned === true || uDataCheck.status === "BANNED" || uDataCheck.status === "banned") {
+        return NextResponse.json({
+          error: "Your account has been banned. Please contact support.",
+          isBanned: true,
+        }, { status: 403 });
+      }
+    }
+
     // =========================================================================
     // ACTION 1: VERIFY NEW DEVICE OTP CHALLENGE & ACTIVATION
     // =========================================================================
