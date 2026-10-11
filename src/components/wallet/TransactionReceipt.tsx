@@ -159,7 +159,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const handleExecuteReportSubmission = async (pin?: string, isBiometricAuthenticated?: boolean) => {
     if (!pendingReportData) return;
 
-    setIsReportPinModalOpen(false);
     setIsSubmittingReport(true);
     toast.loading("Submitting transaction report...", { id: "trn-report" });
 
@@ -190,6 +189,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
       if (res.ok && data.success) {
         toast.success("Your transaction report has been submitted successfully!");
+        setIsReportPinModalOpen(false);
         setIsReportModalOpen(false);
         setPendingReportData(null);
       } else {
