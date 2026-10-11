@@ -177,6 +177,11 @@ export const ShareReceiptModal: React.FC<ShareReceiptModalProps> = ({
     }
   };
 
+  // Explicit zero fee handling for share receipt modal
+  const rawFee = Number(transaction.fee) || 0;
+  const storedTotalDebited = Number(transaction.totalDebited) || 0;
+  const isFreeTransaction = rawFee === 0 && (storedTotalDebited === 0 || storedTotalDebited === displayAmount);
+
   const handlePdfAction = async (action: "share" | "download") => {
     setIsPdfDrawerOpen(false);
     if (generating) return;
