@@ -363,7 +363,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
   const storedTotalDebited = Number(transaction.totalDebited) || 0;
   let combinedTransferFee = rawFee;
-  if (markup > 0) {
+  if (rawFee === 0 && (storedTotalDebited === 0 || storedTotalDebited === transaction.amount)) {
+    combinedTransferFee = 0;
+  } else if (markup > 0) {
     combinedTransferFee = (rawFee > markup && rawFee >= markup + 5) ? rawFee : (rawFee + markup);
   } else if (storedTotalDebited > transaction.amount) {
     combinedTransferFee = Math.max(0, storedTotalDebited - transaction.amount - vat);
@@ -1016,7 +1018,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
                       <span>Transfer Fee</span>
-                      <span className="text-black font-bold">{currencySymbol}{fee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span className="text-black font-bold font-mono">
+                        {fee > 0 ? `${currencySymbol}${fee.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `${currencySymbol}0.00 (Free)`}
+                      </span>
                     </div>
 
                     {vat > 0 && (

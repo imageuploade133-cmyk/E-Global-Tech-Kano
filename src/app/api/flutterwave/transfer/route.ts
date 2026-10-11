@@ -481,14 +481,16 @@ export async function POST(req: Request) {
 
         // Update transaction record with provider reference and re-affirm customer fee & markup
         const provRef = gatewayData.provider_reference || gatewayData.data?.id || gatewayData.data?.reference;
-        const combinedFee = providerFee + transferProfitMargin;
+        const effectiveFee = isFreeTransfer ? 0 : providerFee;
+        const effectiveMarkup = isFreeTransfer ? 0 : transferProfitMargin;
+        const combinedFee = effectiveFee + effectiveMarkup;
         const finalTotalDeduction = trfAmount + combinedFee;
 
         try {
           const updatePayload: Record<string, any> = {
             fee: combinedFee,
             transferFee: combinedFee,
-            markup: transferProfitMargin,
+            markup: effectiveMarkup,
             totalDebited: finalTotalDeduction,
             status: "SUCCESS"
           };
