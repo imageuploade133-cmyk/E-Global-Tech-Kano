@@ -62,6 +62,38 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [referralCode, setReferralCode] = useState("");
 
+  const handleReferralCodeChange = (raw: string) => {
+    const trimmed = raw.toUpperCase().trim();
+    if (!trimmed) {
+      setReferralCode("");
+      return;
+    }
+
+    if ((referralCode === "ET-" || referralCode.startsWith("ET-")) && (trimmed === "ET" || trimmed === "E")) {
+      setReferralCode("");
+      return;
+    }
+
+    if (trimmed === "E" || trimmed === "ET" || trimmed === "ET-") {
+      setReferralCode("ET-");
+      return;
+    }
+
+    let body = trimmed;
+    if (body.startsWith("ET-")) {
+      body = body.slice(3);
+    } else if (body.startsWith("ET")) {
+      body = body.slice(2);
+    }
+
+    const cleanBody = body.replace(/[^A-Z0-9]/g, "");
+    if (!cleanBody) {
+      setReferralCode("ET-");
+    } else {
+      setReferralCode(`ET-${cleanBody}`);
+    }
+  };
+
   // Email Domain Typo Resolver & Vibration Feedback
   const checkEmailTypo = (emailStr: string): string | null => {
     if (!emailStr || !emailStr.includes("@")) return null;
@@ -981,9 +1013,9 @@ export default function SignUpPage() {
                       id="referralCode"
                       type="text"
                       value={referralCode}
-                      onChange={(e) => setReferralCode(e.target.value.trim().toUpperCase())}
+                      onChange={(e) => handleReferralCodeChange(e.target.value)}
                       className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none font-mono"
-                      placeholder="ET-XXXXXX"
+                      placeholder="e.g. ET-XXXXXX (or enter numbers directly)"
                     />
                   </div>
                 </div>
