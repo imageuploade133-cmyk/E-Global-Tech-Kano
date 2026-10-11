@@ -467,6 +467,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [trfNarration, setTrfNarration] = useState("");
   const [trfFee, setTrfFee] = useState(0);
   const [trfTotalDebit, setTrfTotalDebit] = useState(0);
+  const [trfFeeData, setTrfFeeData] = useState<{ remainingFreeTransfers?: number; showFreeIndicator?: boolean } | null>(null);
   const [isFeeLoading, setIsFeeLoading] = useState(false);
 
   // Smart Auto-Detection states (without breaking existing transfer flow)
@@ -1016,10 +1017,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         if (res.ok && data.success) {
           setTrfFee(data.fee);
           setTrfTotalDebit(data.totalDebit);
+          setTrfFeeData(data);
         } else {
           // Fallback to 0 if server estimation is unavailable
           setTrfFee(0);
           setTrfTotalDebit(amt);
+          setTrfFeeData(null);
         }
       } catch {
         setTrfFee(0);
