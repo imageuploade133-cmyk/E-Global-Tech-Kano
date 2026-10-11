@@ -7,9 +7,14 @@ import { FeatureToggles, DEFAULT_FEATURE_TOGGLES } from "@/lib/feature-toggle";
 
 export interface AppConfig {
   featureToggles?: FeatureToggles;
+  appName?: string;
   logoUrl: string;
   receiptLogoUrl?: string;
   receiptName?: string;
+  receiptBgImageUrl?: string;
+  receiptBgImageEnabled?: boolean;
+  receiptBgImageOpacity?: number;
+  receiptCbnText?: string;
   statementLogoUrl?: string;
   statementSignatureUrl?: string;
   statementStampUrl?: string;
@@ -82,9 +87,14 @@ export interface AppConfig {
 const DEFAULT_CONFIG: AppConfig = {
   appVersionPushNotificationEnabled: true,
   featureToggles: DEFAULT_FEATURE_TOGGLES,
+  appName: "E-Global Pay",
   logoUrl: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
   receiptLogoUrl: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
   receiptName: "E-TECH GLOBAL HUB",
+  receiptBgImageUrl: "",
+  receiptBgImageEnabled: false,
+  receiptBgImageOpacity: 0.15,
+  receiptCbnText: "E-Global Pay is a Fintech app powered by Flutterwave, licensed by CBN and insured by NDIC.",
   supportPhone1: "+234 800 345 6225",
   supportPhone2: "+234 901 234 5678",
   supportEmail: "support@e-globaltechhub.com",

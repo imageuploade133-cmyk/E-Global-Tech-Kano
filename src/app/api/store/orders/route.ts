@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { checkServerFeatureStatus } from "@/lib/feature-toggle-server";
+import bcrypt from "bcryptjs";
 
 // Helper function to auto-clean stale unpaid/abandoned orders older than 24 hours & restore stock if needed
 async function autoCleanStaleAbandonedOrders() {
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
     autoCleanStaleAbandonedOrders().catch(() => {});
 
     const body = await req.json();
-    const { items, customerName, customerEmail, customerPhone, deliveryAddress, paymentMethod = "WALLET_NGN" } = body;
+    const { items, customerName, customerEmail, customerPhone, deliveryAddress, paymentMethod = "WALLET_NGN", pin, isBiometricAuthenticated } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Order items list cannot be empty." }, { status: 400 });
@@ -462,6 +463,54 @@ export async function POST(req: Request) {
         // IMPORTANT: Firestore requires every transaction read to complete before any transaction write.
         // Read the user document here, before updating wallet/store/order/ledger documents.
         const userSnap = await transaction.get(userRef);
+        const userData = userSnap.exists ? userSnap.data() || {} : {};
+
+        // PIN / Biometric Verification Guard
+        const isUserBiometricEnabled = userData.isBiometricTransferEnabled === true || userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
+        const isBiometricAuth = isBiometricAuthenticated === true || body.isBiometric === true;
+
+        if (isBiometricAuth && isUserBiometricEnabled) {
+          // Biometric verified
+        } else {
+          const pinHash = userData.pinHash;
+          const currentPlainPin = userData.pin;
+          const lockedUntil = userData.lockedUntil;
+          let pinAttempts = Number(userData.pinAttempts) || 0;
+
+          if (lockedUntil && new Date(lockedUntil).getTime() > Date.now()) {
+            const minutesLeft = Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / (60 * 1000));
+            throw new Error(`Too many incorrect PIN attempts. Account locked for ${minutesLeft} minute(s).`);
+          }
+
+          let isPinMatch = false;
+          if (uid === "mock-uid") {
+            isPinMatch = pin === "1234" || pin === currentPlainPin || (Boolean(pin) && Boolean(pinHash) && bcrypt.compareSync(pin, pinHash));
+          } else if (pin && pinHash) {
+            isPinMatch = bcrypt.compareSync(pin, pinHash);
+          } else if (pin && currentPlainPin) {
+            isPinMatch = pin === currentPlainPin;
+          }
+
+          if (!isPinMatch) {
+            pinAttempts += 1;
+            let lockTimestamp = null;
+            if (pinAttempts >= 5) {
+              lockTimestamp = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+            }
+            if (userSnap.exists) {
+              transaction.update(userRef, {
+                pinAttempts,
+                lockedUntil: lockTimestamp,
+              });
+            }
+            const remaining = Math.max(0, 5 - pinAttempts);
+            throw new Error(
+              pinAttempts >= 5
+                ? "Too many incorrect PIN attempts. Account locked for 15 minutes."
+                : `Incorrect transaction PIN. ${remaining} attempt(s) remaining.`
+            );
+          }
+        }
 
         if (freshBal < calculatedTotalAmount) {
           throw new Error(`Insufficient wallet balance. Order total is ₦${calculatedTotalAmount.toLocaleString()}, but your balance is ₦${freshBal.toLocaleString()}. Please switch to 'Checkout with Card Payment'.`);

@@ -48,7 +48,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
 
   const [fromDate, setFromDate] = useState<string>(oneMonthAgoStr);
   const [toDate, setToDate] = useState<string>(todayStr);
-  const [deliveryMethod, setDeliveryMethod] = useState<"download" | "email">("download");
+  const [deliveryMethod, setDeliveryMethod] = useState<"download" | "email" | "share">("download");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
   // Quick Preset State
@@ -72,7 +72,9 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
     const today = now.toISOString().split("T")[0];
     setToDate(today);
 
-    if (preset === "30DAYS") {
+    if (preset === "TODAY") {
+      setFromDate(today);
+    } else if (preset === "30DAYS") {
       const d = new Date();
       d.setDate(d.getDate() - 30);
       setFromDate(d.toISOString().split("T")[0]);
@@ -92,10 +94,9 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
       const end = new Date(now.getFullYear(), now.getMonth(), 0);
       setFromDate(start.toISOString().split("T")[0]);
       setToDate(end.toISOString().split("T")[0]);
-    } else if (preset === "6MONTHS") {
-      const d = new Date();
-      d.setMonth(d.getMonth() - 6);
-      setFromDate(d.toISOString().split("T")[0]);
+    } else if (preset === "ALL_TIME") {
+      // All time setting start date back to early platform start (e.g., 2020-01-01)
+      setFromDate("2020-01-01");
     }
   };
 
@@ -130,13 +131,6 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
 
     if (start > end) {
       toast.error("From Date cannot be later than To Date.");
-      return { valid: false, startIso: "", endIso: "" };
-    }
-
-    // Enforce max 6-month range constraint (~183 days)
-    const sixMonthsInMs = 183 * 24 * 60 * 60 * 1000;
-    if (end.getTime() - start.getTime() > sixMonthsInMs) {
-      toast.error("Statements are limited to a maximum range of 6 months at a time.");
       return { valid: false, startIso: "", endIso: "" };
     }
 
@@ -189,7 +183,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
       setIsPinModalOpen(false);
       setIsVerifyingPin(false);
 
-      if (deliveryMethod === "download") {
+      if (deliveryMethod === "download" || deliveryMethod === "share") {
         // Fetch client-side Firestore transactions
         const q = query(
           collection(db, "transactions"),
@@ -430,22 +424,60 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
             ? (window as any).flutter_inappwebview
             : null;
 
-        if (bridge && typeof bridge.callHandler === "function") {
-          const saved = await bridge.callHandler("downloadBase64File", {
-            data: statementDataUri,
-            fileName: statementFileName,
-            mimeType: "application/pdf",
-          });
-          if (saved !== true && !saved?.success) {
-            throw new Error("Native statement download failed.");
-          }
-        } else {
-          doc.save(statementFileName);
-        }
+        if (deliveryMethod === "share") {
+          const pdfBlob = doc.output("blob");
+          const pdfFile = new File([pdfBlob], statementFileName, { type: "application/pdf" });
 
-        toast.dismiss("statement-gen");
-        toast.success("Bank Statement PDF generated and downloaded successfully!");
-        onClose();
+          if (bridge && typeof bridge.callHandler === "function") {
+            const shared = await bridge.callHandler("shareFile", {
+              data: statementDataUri,
+              fileName: statementFileName,
+              mimeType: "application/pdf",
+            });
+            if (shared !== true && !shared?.success) {
+              // Fallback to Web Share
+              if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+                await navigator.share({
+                  title: "Statement of Account",
+                  text: `E-Global Pay Statement of Account (${fromDate} to ${toDate})`,
+                  files: [pdfFile],
+                });
+              } else {
+                doc.save(statementFileName);
+              }
+            }
+          } else if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+            await navigator.share({
+              title: "Statement of Account",
+              text: `E-Global Pay Statement of Account (${fromDate} to ${toDate})`,
+              files: [pdfFile],
+            });
+          } else {
+            // Fallback download if Web Share is not supported
+            doc.save(statementFileName);
+          }
+
+          toast.dismiss("statement-gen");
+          toast.success("Bank Statement PDF shared successfully!");
+          onClose();
+        } else {
+          if (bridge && typeof bridge.callHandler === "function") {
+            const saved = await bridge.callHandler("downloadBase64File", {
+              data: statementDataUri,
+              fileName: statementFileName,
+              mimeType: "application/pdf",
+            });
+            if (saved !== true && !saved?.success) {
+              throw new Error("Native statement download failed.");
+            }
+          } else {
+            doc.save(statementFileName);
+          }
+
+          toast.dismiss("statement-gen");
+          toast.success("Bank Statement PDF generated and downloaded successfully!");
+          onClose();
+        }
       } else {
         // Call S2S API route to dispatch statement to user email passing verified PIN / Biometric
         const res = await fetch("/api/history/statement/email", {
@@ -526,14 +558,6 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
                 </div>
               </div>
 
-              {/* 6-Month Constraint Guidance Note */}
-              <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-2xl flex items-start gap-3">
-                <span className="material-symbols-outlined text-amber-600 text-[20px] shrink-0 mt-0.5">info</span>
-                <p className="font-hanken text-xs text-amber-900 leading-snug">
-                  Statements can be generated for up to <strong>6 months</strong> of transaction history per request.
-                </p>
-              </div>
-
               {/* Quick Date Range Selection Pills */}
               <div className="space-y-2">
                 <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block">
@@ -542,14 +566,14 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
                 <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-50 rounded-2xl border border-gray-100">
                   <button
                     type="button"
-                    onClick={() => handleSetPreset("30DAYS")}
+                    onClick={() => handleSetPreset("TODAY")}
                     className={`py-2 text-[10px] font-extrabold uppercase rounded-xl transition-all cursor-pointer ${
-                      selectedPreset === "30DAYS"
+                      selectedPreset === "TODAY"
                         ? "bg-[#FC7A00] text-white shadow-2xs"
                         : "text-gray-600 hover:text-black"
                     }`}
                   >
-                    Last 30 Days
+                    Today
                   </button>
 
                   <button
@@ -566,14 +590,14 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
 
                   <button
                     type="button"
-                    onClick={() => handleSetPreset("60DAYS")}
+                    onClick={() => handleSetPreset("30DAYS")}
                     className={`py-2 text-[10px] font-extrabold uppercase rounded-xl transition-all cursor-pointer ${
-                      selectedPreset === "60DAYS"
+                      selectedPreset === "30DAYS"
                         ? "bg-[#FC7A00] text-white shadow-2xs"
                         : "text-gray-600 hover:text-black"
                     }`}
                   >
-                    Last 60 Days
+                    Last 30 Days
                   </button>
 
                   <button
@@ -602,14 +626,14 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
 
                   <button
                     type="button"
-                    onClick={() => handleSetPreset("6MONTHS")}
+                    onClick={() => handleSetPreset("ALL_TIME")}
                     className={`py-2 text-[10px] font-extrabold uppercase rounded-xl transition-all cursor-pointer ${
-                      selectedPreset === "6MONTHS"
+                      selectedPreset === "ALL_TIME"
                         ? "bg-[#FC7A00] text-white shadow-2xs"
                         : "text-gray-600 hover:text-black"
                     }`}
                   >
-                    6 Months
+                    All Time
                   </button>
                 </div>
               </div>
@@ -659,46 +683,67 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
                 <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block">
                   Delivery Format / Action
                 </label>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setDeliveryMethod("download")}
-                    className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                       deliveryMethod === "download"
                         ? "border-[#FC7A00] bg-orange-50/90 text-black font-extrabold shadow-3xs"
                         : "border-gray-200 bg-white text-gray-600 font-bold hover:bg-gray-50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">picture_as_pdf</span>
+                      <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">download</span>
                       {deliveryMethod === "download" && (
-                        <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">check_circle</span>
+                        <span className="material-symbols-outlined text-[14px] text-[#FC7A00]">check_circle</span>
                       )}
                     </div>
                     <div className="mt-2">
-                      <span className="text-xs uppercase font-extrabold block">PDF Download</span>
-                      <span className="text-[9.5px] text-gray-400 font-semibold block">Save file to device</span>
+                      <span className="text-[11px] uppercase font-extrabold block">Download</span>
+                      <span className="text-[8.5px] text-gray-400 font-semibold block">Save PDF</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryMethod("share")}
+                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                      deliveryMethod === "share"
+                        ? "border-[#FC7A00] bg-orange-50/90 text-black font-extrabold shadow-3xs"
+                        : "border-gray-200 bg-white text-gray-600 font-bold hover:bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">share</span>
+                      {deliveryMethod === "share" && (
+                        <span className="material-symbols-outlined text-[14px] text-[#FC7A00]">check_circle</span>
+                      )}
+                    </div>
+                    <div className="mt-2">
+                      <span className="text-[11px] uppercase font-extrabold block">Share PDF</span>
+                      <span className="text-[8.5px] text-gray-400 font-semibold block">Send via apps</span>
                     </div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setDeliveryMethod("email")}
-                    className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                       deliveryMethod === "email"
                         ? "border-[#FC7A00] bg-orange-50/90 text-black font-extrabold shadow-3xs"
                         : "border-gray-200 bg-white text-gray-600 font-bold hover:bg-gray-50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">mail</span>
+                      <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">mail</span>
                       {deliveryMethod === "email" && (
-                        <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">check_circle</span>
+                        <span className="material-symbols-outlined text-[14px] text-[#FC7A00]">check_circle</span>
                       )}
                     </div>
                     <div className="mt-2">
-                      <span className="text-xs uppercase font-extrabold block">Send to Email</span>
-                      <span className="text-[9.5px] text-gray-400 font-semibold block">Deliver to registered inbox</span>
+                      <span className="text-[11px] uppercase font-extrabold block">Email</span>
+                      <span className="text-[8.5px] text-gray-400 font-semibold block">To inbox</span>
                     </div>
                   </button>
                 </div>
@@ -721,9 +766,15 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
                 ) : (
                   <>
                     <span className="material-symbols-outlined text-[18px]">
-                      {deliveryMethod === "download" ? "download" : "send"}
+                      {deliveryMethod === "download" ? "download" : deliveryMethod === "share" ? "share" : "send"}
                     </span>
-                    <span>{deliveryMethod === "download" ? "Download PDF Statement" : "Send Statement to Email"}</span>
+                    <span>
+                      {deliveryMethod === "download"
+                        ? "Download PDF Statement"
+                        : deliveryMethod === "share"
+                        ? "Share PDF Statement"
+                        : "Send Statement to Email"}
+                    </span>
                   </>
                 )}
               </button>

@@ -27,6 +27,10 @@ function CpanelSettingsPageContent() {
   const [logoInput, setLogoInput] = useState(config.logoUrl);
   const [receiptLogoInput, setReceiptLogoInput] = useState(config.receiptLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
   const [receiptNameInput, setReceiptNameInput] = useState(config.receiptName || "E-TECH GLOBAL HUB");
+  const [receiptBgImageUrlInput, setReceiptBgImageUrlInput] = useState(config.receiptBgImageUrl || "");
+  const [receiptBgImageEnabledInput, setReceiptBgImageEnabledInput] = useState(config.receiptBgImageEnabled === true);
+  const [receiptBgImageOpacityInput, setReceiptBgImageOpacityInput] = useState(config.receiptBgImageOpacity ?? 0.15);
+  const [receiptCbnTextInput, setReceiptCbnTextInput] = useState(config.receiptCbnText || "E-Global Pay is a Fintech app powered by Flutterwave, licensed by CBN and insured by NDIC.");
   const [statementLogoInput, setStatementLogoInput] = useState(config.statementLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
   const [statementSignatureInput, setStatementSignatureInput] = useState(config.statementSignatureUrl || "");
   const [statementStampInput, setStatementStampInput] = useState(config.statementStampUrl || "");
@@ -47,6 +51,7 @@ function CpanelSettingsPageContent() {
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUploadingReceiptLogo, setIsUploadingReceiptLogo] = useState(false);
+  const [isUploadingReceiptBg, setIsUploadingReceiptBg] = useState(false);
   const [isUploadingStatementLogo, setIsUploadingStatementLogo] = useState(false);
   const [isUploadingSignature, setIsUploadingSignature] = useState(false);
   const [isUploadingStamp, setIsUploadingStamp] = useState(false);
@@ -60,6 +65,10 @@ function CpanelSettingsPageContent() {
     setLogoInput(config.logoUrl);
     setReceiptLogoInput(config.receiptLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
     setReceiptNameInput(config.receiptName || "E-TECH GLOBAL HUB");
+    setReceiptBgImageUrlInput(config.receiptBgImageUrl || "");
+    setReceiptBgImageEnabledInput(config.receiptBgImageEnabled === true);
+    setReceiptBgImageOpacityInput(config.receiptBgImageOpacity ?? 0.15);
+    setReceiptCbnTextInput(config.receiptCbnText || "E-Global Pay is a Fintech app powered by Flutterwave, licensed by CBN and insured by NDIC.");
     setStatementLogoInput(config.statementLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
     setStatementSignatureInput(config.statementSignatureUrl || "");
     setStatementStampInput(config.statementStampUrl || "");
@@ -99,6 +108,10 @@ function CpanelSettingsPageContent() {
         logoUrl: logoInput,
         receiptLogoUrl: receiptLogoInput,
         receiptName: receiptNameInput,
+        receiptBgImageUrl: receiptBgImageUrlInput,
+        receiptBgImageEnabled: receiptBgImageEnabledInput,
+        receiptBgImageOpacity: receiptBgImageOpacityInput,
+        receiptCbnText: receiptCbnTextInput,
         statementLogoUrl: statementLogoInput,
         statementSignatureUrl: statementSignatureInput,
         statementStampUrl: statementStampInput,
@@ -157,6 +170,34 @@ function CpanelSettingsPageContent() {
       toast.error(err.message || "Receipt logo upload failed.");
     } finally {
       setIsUploadingReceiptLogo(false);
+    }
+  };
+
+  const handleReceiptBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingReceiptBg(true);
+    toast.loading("Uploading receipt background image securely...");
+
+    try {
+      const result = await uploadImageSecurely(file, "receipt_logo");
+      toast.dismiss();
+
+      if (result.success && result.url) {
+        const uploadedUrl = result.url;
+        setReceiptBgImageUrlInput(uploadedUrl);
+        setReceiptBgImageEnabledInput(true);
+        updateConfig({ receiptBgImageUrl: uploadedUrl, receiptBgImageEnabled: true });
+        toast.success("Receipt background image uploaded and enabled!");
+      } else {
+        toast.error(result.error || "Failed to upload receipt background image!");
+      }
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || "Receipt background upload failed.");
+    } finally {
+      setIsUploadingReceiptBg(false);
     }
   };
 
@@ -712,9 +753,9 @@ function CpanelSettingsPageContent() {
                 <div>
                   <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[16px]">receipt_long</span>
-                    Transaction Receipt Branding & Logo
+                    Transaction Receipt Branding, Background & Regulatory Disclaimer
                   </label>
-                  <p className="text-[9px] text-gray-400 mt-0.5">Customize the header name and logo image displayed on PDF, PNG, and Shared Receipts.</p>
+                  <p className="text-[9px] text-gray-400 mt-0.5">Customize the header name, logo image, background image, transparency, and CBN regulatory disclaimer displayed on Share Receipts.</p>
                 </div>
 
                 <div className="space-y-1">
@@ -749,6 +790,91 @@ function CpanelSettingsPageContent() {
                       className={cn(inputClass, "cursor-pointer py-1.5 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-extrabold file:bg-[#FC7A00]/10 file:text-[#FC7A00]")}
                     />
                   </div>
+                </div>
+
+                {/* Background Image Controls */}
+                <div className="border-t border-gray-200/30 dark:border-gray-800 pt-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px] text-orange-500">wallpaper</span>
+                        Receipt Background Image
+                      </label>
+                      <p className="text-[8.5px] text-gray-400">Upload or configure a background image to render behind the ticket receipt card.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReceiptBgImageEnabledInput(!receiptBgImageEnabledInput)}
+                      className={cn(
+                        "px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer border transition-all",
+                        receiptBgImageEnabledInput
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                          : "bg-red-500/10 text-red-500 border-red-500/30"
+                      )}
+                    >
+                      {receiptBgImageEnabledInput ? "BG IMAGE SHOWN" : "BG IMAGE HIDDEN"}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400">Background Image URL</label>
+                      <input
+                        type="url"
+                        value={receiptBgImageUrlInput}
+                        onChange={(e) => setReceiptBgImageUrlInput(e.target.value)}
+                        placeholder="https://i.ibb.co/..."
+                        className={inputClass}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400">Upload Background File</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingReceiptBg}
+                        onChange={handleReceiptBgUpload}
+                        className={cn(inputClass, "cursor-pointer py-1.5 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-extrabold file:bg-[#FC7A00]/10 file:text-[#FC7A00]")}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Opacity Slider */}
+                  <div className="bg-gray-50/80 dark:bg-gray-900/40 p-3 rounded-xl border border-gray-200/50 dark:border-gray-800 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black uppercase text-gray-500 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px] text-[#FC7A00]">opacity</span>
+                        Receipt Background Image Transparency / Opacity
+                      </label>
+                      <span className="font-mono text-xs font-black text-[#FC7A00]">{Math.round(receiptBgImageOpacityInput * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.05}
+                      max={0.80}
+                      step={0.01}
+                      value={receiptBgImageOpacityInput}
+                      onChange={(e) => setReceiptBgImageOpacityInput(Number(e.target.value))}
+                      className="w-full accent-[#FC7A00] cursor-pointer"
+                    />
+                    <p className="text-[8.5px] text-gray-400">Controls background image transparency on receipt (15% is standard background watermark).</p>
+                  </div>
+                </div>
+
+                {/* Customizable CBN Disclaimer Text */}
+                <div className="border-t border-gray-200/30 dark:border-gray-800 pt-3 space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px] text-blue-500">verified_user</span>
+                    Custom CBN / Regulatory Disclaimer Text
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={receiptCbnTextInput}
+                    onChange={(e) => setReceiptCbnTextInput(e.target.value)}
+                    placeholder="Enter custom CBN / NDIC regulatory statement..."
+                    className={cn(inputClass, "h-auto py-2 font-normal leading-relaxed text-[11px]")}
+                  />
+                  <p className="text-[8.5px] text-gray-400">Displayed at the bottom footer of Share Receipts.</p>
                 </div>
               </div>
 

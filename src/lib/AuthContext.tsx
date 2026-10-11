@@ -43,6 +43,7 @@ interface UserData {
   virtualAccountActive?: boolean;
   virtualAccountNumber?: string;
   virtualAccountBankName?: string;
+  accountNumber?: string;
   accountId?: string | number;
   is2faOtpEnabled?: boolean;
   [key: string]: unknown;

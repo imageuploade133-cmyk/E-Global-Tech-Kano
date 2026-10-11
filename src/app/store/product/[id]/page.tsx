@@ -382,7 +382,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     executeStoreOrder();
   };
 
-  const executeStoreOrder = async () => {
+  const executeStoreOrder = async (pin?: string, isBiometricAuthenticated?: boolean) => {
     setIsStorePinModalOpen(false);
     setIsPlacingOrder(true);
     toast.loading("Processing order payment...", { id: "place-order" });
@@ -410,6 +410,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         customerPhone: customerDeliveryPhone,
         deliveryAddress: customerDeliveryAddress,
         paymentMethod: selectedPaymentMethod,
+        pin,
+        isBiometricAuthenticated,
       };
 
       const res = await fetch("/api/store/orders", {
@@ -1534,7 +1536,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           title="Authorize Store Purchase"
           description={`Approving ₦${cart.reduce((s, i) => s + i.product.price * i.quantity, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} store order.`}
           isSubmitting={isPlacingOrder}
-          onPinSubmit={() => executeStoreOrder()}
+          onPinSubmit={(pin, isBiometricAuthenticated) => executeStoreOrder(pin, isBiometricAuthenticated)}
         />
       </div>
     </RouteGuard>

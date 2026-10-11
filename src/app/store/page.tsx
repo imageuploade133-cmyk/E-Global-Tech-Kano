@@ -324,7 +324,7 @@ export default function StorePage() {
     executeStoreOrder();
   };
 
-  const executeStoreOrder = async () => {
+  const executeStoreOrder = async (pin?: string, isBiometricAuthenticated?: boolean) => {
     setIsStorePinModalOpen(false);
     setIsPlacingOrder(true);
     toast.loading("Processing order payment...", { id: "place-order" });
@@ -352,6 +352,8 @@ export default function StorePage() {
         customerPhone: customerDeliveryPhone,
         deliveryAddress: customerDeliveryAddress,
         paymentMethod: selectedPaymentMethod,
+        pin,
+        isBiometricAuthenticated,
       };
 
       const res = await fetch("/api/store/orders", {
@@ -629,7 +631,7 @@ export default function StorePage() {
           title="Authorize Store Purchase"
           description={`Approving ₦${cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} store order.`}
           isSubmitting={isPlacingOrder}
-          onPinSubmit={() => executeStoreOrder()}
+          onPinSubmit={(pin, isBiometricAuthenticated) => executeStoreOrder(pin, isBiometricAuthenticated)}
         />
 
         <BottomNav />

@@ -3,6 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import { CartItem } from "./types";
 
 interface StoreCartModalProps {
@@ -313,12 +314,30 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
                   <form
                     id="checkout-form"
                     onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!customerDeliveryName || !customerDeliveryName.trim()) {
+                        toast.error("Please enter full recipient name.");
+                        return;
+                      }
+                      if (!customerDeliveryPhone || !customerDeliveryPhone.trim()) {
+                        toast.error("Please enter a valid delivery phone number.");
+                        return;
+                      }
+                      if (!customerDeliveryAddress || !customerDeliveryAddress.trim()) {
+                        toast.error(
+                          deliveryType === "PICKUP"
+                            ? "Please enter in-store pickup notes / contact person."
+                            : "Please enter your full delivery address."
+                        );
+                        return;
+                      }
+
                       if (deliveryType === "PICKUP" && !customerDeliveryAddress.toUpperCase().includes("PICKUP")) {
                         onSetCustomerDeliveryAddress(`[IN-STORE PICKUP] ${customerDeliveryAddress.trim()}`);
                       }
                       onConfirmCheckout(e);
                     }}
-                    className="space-y-3.5"
+                    className="space-y-3.5 pb-20"
                   >
                     {/* Fulfillment Method Selector (Shown when enablePickup is ON) */}
                     {enablePickup && (
