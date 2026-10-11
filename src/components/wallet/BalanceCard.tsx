@@ -11,7 +11,7 @@ import { db } from "@/lib/firebase";
 import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
 import { TierUpgradeDrawerModal } from "@/components/profile/TransferLimitsSection";
-import { AuthorizeTransferModal } from "@/components/wallet/AuthorizeTransferModal";
+import { AuthorizeTransactionModal } from "@/components/wallet/AuthorizeTransactionModal";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { AppLogo } from "@/components/AppLogo";
@@ -2212,161 +2212,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       return;
     }
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Transaction Receipt</title>
-        <style>
-          body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            color: #333;
-            padding: 40px;
-            background-color: #fff;
-          }
-          .receipt-card {
-            border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            max-width: 600px;
-            margin: 0 auto;
-            overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-          }
-          .header {
-            background: linear-gradient(135deg, #FC7A00, #E06600);
-            color: #fff;
-            padding: 30px;
-            text-align: center;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 26px;
-            font-weight: 900;
-            letter-spacing: 1px;
-          }
-          .header p {
-            margin: 5px 0 0 0;
-            font-size: 12px;
-            opacity: 0.9;
-            font-weight: bold;
-          }
-          .success-badge {
-            text-align: center;
-            margin-top: -20px;
-          }
-          .badge-inner {
-            background-color: #10B981;
-            color: white;
-            display: inline-block;
-            padding: 10px 24px;
-            border-radius: 50px;
-            font-weight: 900;
-            font-size: 14px;
-            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
-          }
-          .details-container {
-            padding: 40px;
-          }
-          .row {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid #f1f5f9;
-            font-size: 14px;
-          }
-          .label {
-            color: #64748b;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 11px;
-            letter-spacing: 0.5px;
-          }
-          .value {
-            color: #0f172a;
-            font-weight: bold;
-            text-align: right;
-          }
-          .value.amount {
-            color: #10B981;
-            font-size: 18px;
-            font-weight: 900;
-          }
-          .value.success {
-            color: #10B981;
-          }
-          .footer {
-            text-align: center;
-            padding: 30px;
-            background-color: #f8fafc;
-            border-top: 1px solid #e2e8f0;
-            font-size: 12px;
-            color: #94a3b8;
-            line-height: 1.6;
-          }
-          @media print {
-            body {
-              padding: 0;
-            }
-            .receipt-card {
-              border: none;
-              box-shadow: none;
-              max-width: 100%;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="receipt-card">
-          <div class="header">
-            <h1>E-TECH GLOBAL HUB</h1>
-            <p>OFFICIAL TRANSACTION DOCUMENT</p>
-          </div>
-          <div class="success-badge">
-            <div class="badge-inner">✓ SUCCESSFUL</div>
-          </div>
-          <div class="details-container">
-            <div class="row">
-              <span class="label">Recipient Name</span>
-              <span class="value">${isBulkMode ? "Batch Recipients" : (trfAccountName || "Beneficiary").toUpperCase()}</span>
-            </div>
-            <div class="row">
-              <span class="label">Destination Bank</span>
-              <span class="value">${isBulkMode ? "Multiple Banks" : (trfBank?.name || "N/A").toUpperCase()}</span>
-            </div>
-            <div class="row">
-              <span class="label">Account Number</span>
-              <span class="value">${isBulkMode ? "Multiple" : trfAccount}</span>
-            </div>
-            <div class="row">
-              <span class="label">Amount Debited</span>
-              <span class="value amount">₦${parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div class="row">
-              <span class="label">Transfer Fee</span>
-              <span class="value">₦${trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div class="row">
-              <span class="label">Reference Code</span>
-              <span class="value" style="font-family: monospace;">${transferResult?.reference || "N/A"}</span>
-            </div>
-            <div class="row">
-              <span class="label">Settlement Date</span>
-              <span class="value">${new Date().toLocaleString()}</span>
-            </div>
-            <div class="row">
-              <span class="label">Status</span>
-              <span class="value success">SUCCESSFUL</span>
-            </div>
-          </div>
-          <div class="footer">
-            <strong>Thank you for choosing E-Tech Global Hub.</strong><br/>
-            This receipt serves as official proof of outward payment processing.<br/>
-            Support: support@etechglobalhub.com
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    const htmlContent = "\n      <!DOCTYPE html>\n      <html>\n      <head>\n        <title>Transaction Receipt</title>\n        <style>" + "\n          body {\n            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;\n            color: #333;\n            padding: 40px;\n            background-color: #fff;\n          }\n          .receipt-card {\n            border: 1px solid #e2e8f0;\n            border-radius: 16px;\n            max-width: 600px;\n            margin: 0 auto;\n            overflow: hidden;\n            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);\n          }\n          .header {\n            background: linear-gradient(135deg, #FC7A00, #E06600);\n            color: #fff;\n            padding: 30px;\n            text-align: center;\n          }\n          .header h1 {\n            margin: 0;\n            font-size: 26px;\n            font-weight: 900;\n            letter-spacing: 1px;\n          }\n          .header p {\n            margin: 5px 0 0 0;\n            font-size: 12px;\n            opacity: 0.9;\n            font-weight: bold;\n          }\n          .success-badge {\n            text-align: center;\n            margin-top: -20px;\n          }\n          .badge-inner {\n            background-color: #10B981;\n            color: white;\n            display: inline-block;\n            padding: 10px 24px;\n            border-radius: 50px;\n            font-weight: 900;\n            font-size: 14px;\n            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);\n          }\n          .details-container {\n            padding: 40px;\n          }\n          .row {\n            display: flex;\n            justify-content: space-between;\n            padding: 12px 0;\n            border-bottom: 1px solid #f1f5f9;\n            font-size: 14px;\n          }\n          .label {\n            color: #64748b;\n            font-weight: bold;\n            text-transform: uppercase;\n            font-size: 11px;\n            letter-spacing: 0.5px;\n          }\n          .value {\n            color: #0f172a;\n            font-weight: bold;\n            text-align: right;\n          }\n          .value.amount {\n            color: #10B981;\n            font-size: 18px;\n            font-weight: 900;\n          }\n          .value.success {\n            color: #10B981;\n          }\n          .footer {\n            text-align: center;\n            padding: 30px;\n            background-color: #f8fafc;\n            border-top: 1px solid #e2e8f0;\n            font-size: 12px;\n            color: #94a3b8;\n            line-height: 1.6;\n          }\n          @media print {\n            body {\n              padding: 0;\n            }\n            .receipt-card {\n              border: none;\n              box-shadow: none;\n              max-width: 100%;\n            }\n          }\n        " + "</style>\n      </head>\n      <body>\n        <div class=\"receipt-card\">\n          <div class=\"header\">\n            <h1>E-TECH GLOBAL HUB</h1>\n            <p>OFFICIAL TRANSACTION DOCUMENT</p>\n          </div>\n          <div class=\"success-badge\">\n            <div class=\"badge-inner\">✓ SUCCESSFUL</div>\n          </div>\n          <div class=\"details-container\">\n            <div class=\"row\">\n              <span class=\"label\">Recipient Name</span>\n              <span class=\"value\">${isBulkMode ? \"Batch Recipients\" : (trfAccountName || \"Beneficiary\").toUpperCase()}</span>\n            </div>\n            <div class=\"row\">\n              <span class=\"label\">Destination Bank</span>\n              <span class=\"value\">${isBulkMode ? \"Multiple Banks\" : (trfBank?.name || \"N/A\").toUpperCase()}</span>\n            </div>\n            <div class=\"row\">\n              <span class=\"label\">Account Number</span>\n              <span class=\"value\">${isBulkMode ? \"Multiple\" : trfAccount}</span>\n            </div>\n            <div class=\"row\">\n              <span class=\"label\">Amount Debited</span>\n              <span class=\"value amount\">₦${parseFloat(trfAmount).toLocaleString(\"en-NG\", { minimumFractionDigits: 2 })}</span>\n            </div>\n            <div class=\"row\">\n              <span class=\"label\">Transfer Fee</span>\n              <span class=\"value\">₦${trfFee.toLocaleString(\"en-NG\", { minimumFractionDigits: 2 })}</span>\n            </div>\n            <div class=\"row\">\n              <span class=\"label\">Reference Code</span>\n              <span class=\"value\" style=\"font-family: monospace;\">${transferResult?.reference || \"N/A\"}</span>\n            </div>\n            <div class=\"row\">\n              <span class=\"label\">Settlement Date</span>\n              <span class=\"value\">${new Date().toLocaleString()}</span>\n            </div>\n            <div class=\"row\">\n              <span class=\"label\">Status</span>\n              <span class=\"value success\">SUCCESSFUL</span>\n            </div>\n          </div>\n          <div class=\"footer\">\n            <strong>Thank you for choosing E-Tech Global Hub.</strong><br/>\n            This receipt serves as official proof of outward payment processing.<br/>\n            Support: support@etechglobalhub.com\n          </div>\n        </div>\n      </body>\n      </html>\n    ";
 
     doc.open();
     doc.write(htmlContent);
@@ -4619,23 +4465,19 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       Confirm Batch Details
                     </button>
                   )
-                )}
-
-                {trfStep === "confirm" && (
+                ) : trfStep === "confirm" ? (
                   <button
                     type="button"
                     onClick={() => {
                       triggerHaptic();
-                      setTrfStep("pin");
-                      setTrfPin("");
-                      setIsTrf2faStage(false);
+                      setIsTrfPinModalOpen(true);
                     }}
                     className="w-full py-4 bg-black hover:bg-black/90 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2 border-0 relative z-30"
                   >
-                    <span>Confirm and Proceed</span>
-                    <span className="material-symbols-outlined text-[16px] font-black">arrow_forward</span>
+                    <span>Authorize Transaction</span>
+                    <span className="material-symbols-outlined text-[16px] font-black">lock</span>
                   </button>
-                )}
+                ) : null}
               </div>
             )}
           </motion.div>
@@ -5142,8 +4984,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       onRequestSubmitted={() => setIsTierUpgradeOpen(false)}
     />
 
-    {/* Dedicated Authorize Transfer Modal */}
-    <AuthorizeTransferModal
+    {/* Dedicated Authorize Transaction Modal */}
+    <AuthorizeTransactionModal
       isOpen={isTrfPinModalOpen}
       recipientName={isBulkMode ? `${bulkRecipients.length} Batch Recipients` : trfAccountName}
       bankName={isBulkMode ? "Multiple Banks" : trfBank?.name || "Bank"}
