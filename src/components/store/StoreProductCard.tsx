@@ -204,21 +204,35 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           </button>
 
           {/* Buy Now Direct Button */}
-          <button
-            type="button"
-            disabled={!item.inStock}
-            onClick={(e) => onBuyNow(e, item)}
-            style={{
-              backgroundColor: settings.storeButtonColor || "#FC7A00",
-              color: settings.storeButtonTextColor || "#FFFFFF",
-            }}
-            className="flex-1 py-2 hover:opacity-90 disabled:from-gray-300 disabled:to-gray-400 rounded-xl text-[9.5px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-2xs border-0"
-          >
-            <span className="material-symbols-outlined text-[14px]">
-              {settings.storeButtonIcon || "bolt"}
-            </span>
-            <span>Buy Now</span>
-          </button>
+          {(() => {
+            const isAvailableInStock =
+              item.inStock &&
+              (item.unlimitedStock || typeof item.stockQuantity !== "number" || item.stockQuantity > 0);
+
+            return (
+              <button
+                type="button"
+                disabled={!isAvailableInStock}
+                onClick={(e) => isAvailableInStock && onBuyNow(e, item)}
+                style={{
+                  backgroundColor: isAvailableInStock
+                    ? settings.storeButtonColor || "#FC7A00"
+                    : "#9CA3AF",
+                  color: settings.storeButtonTextColor || "#FFFFFF",
+                }}
+                className={`flex-1 py-2 rounded-xl text-[9.5px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 shadow-2xs border-0 ${
+                  isAvailableInStock
+                    ? "hover:opacity-90 cursor-pointer active:scale-95"
+                    : "cursor-not-allowed opacity-75"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[14px]">
+                  {isAvailableInStock ? settings.storeButtonIcon || "bolt" : "block"}
+                </span>
+                <span>{isAvailableInStock ? "Buy Now" : "Out of Stock"}</span>
+              </button>
+            );
+          })()}
         </div>
       </div>
     </motion.div>
