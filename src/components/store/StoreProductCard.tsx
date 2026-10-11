@@ -82,7 +82,11 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               src={displayCoverUrl}
               alt={item.title}
               fill
-              className="object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+              className={`${
+                settings.productCardImageMode === "contain"
+                  ? "object-contain p-2"
+                  : "object-cover"
+              } group-hover:scale-105 transition-transform duration-300`}
               unoptimized
             />
           ) : (
