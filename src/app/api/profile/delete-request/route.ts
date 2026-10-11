@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import { adminDb } from "@/lib/firebase-admin";
 import { authenticateUserRequest } from "@/lib/auth-util";
 
@@ -66,7 +67,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `Too many incorrect PIN attempts. Locked for ${minutesLeft} minute(s).` }, { status: 403 });
       }
 
-      const bcrypt = require("bcryptjs");
       let isPinMatch = false;
       if (uid === "mock-uid") {
         isPinMatch = pin === "1234" || pin === currentPlainPin || (Boolean(pin) && Boolean(pinHash) && bcrypt.compareSync(pin, pinHash));
