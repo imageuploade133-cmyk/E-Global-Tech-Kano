@@ -493,12 +493,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
     recipientNameDisplay = transaction.beneficiaryName || transaction.recipientName || "Beneficiary";
     const recBank = resolvedTransferToBank !== "Bank" ? resolvedTransferToBank : (transaction.recipientBankName || "Bank");
-    const recAcc = maskAccountNum(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber);
+    const recAcc = transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber;
     recipientBankAndAcc = recAcc ? `${recBank} | ${recAcc}` : recBank;
 
     senderNameDisplay = userFullName || transaction.senderName || config.appName || "E-Global Pay User";
     const sendBank = config.appName || "E-Global Pay";
-    const sendAcc = maskAccountNum(userData?.virtualAccountNumber || userData?.accountNumber || transaction.senderAccountNumber);
+    const sendAcc = userData?.virtualAccountNumber || userData?.accountNumber || transaction.senderAccountNumber;
     senderBankAndAcc = sendAcc ? `${sendBank} | ${sendAcc}` : sendBank;
   } else if (isBill || isAirtime || isData || isElectricity || isCable || isWaec) {
     txTypeDisplay = isAirtime ? "Airtime Top-up" : isData ? "Data Bundle" : isElectricity ? "Electricity Utility" : isCable ? "Cable TV" : isWaec ? "WAEC Purchase" : "Bill Payment";
@@ -891,10 +891,20 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 {isTransfer && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Transfer To</span>
-                      <span className="text-black font-bold uppercase text-right pl-3 break-words max-w-[220px]">
-                        {transaction.beneficiaryName || transaction.recipientName || "Not available"}
-                      </span>
+                      <span>Sender Details</span>
+                      <div className="flex flex-col items-end text-right max-w-[220px]">
+                        <span className="text-black font-bold uppercase">
+                          {userFullName || transaction.senderName || config.appName || "E-Global Pay User"}
+                        </span>
+                        <span className="text-black font-extrabold text-xs tracking-tight mt-0.5">
+                          {config.appName || "E-Global Pay"}
+                        </span>
+                        {(userData?.virtualAccountNumber || userData?.accountNumber || transaction.senderAccountNumber) && (
+                          <span className="font-mono text-gray-600 font-bold text-[11px] mt-0.5">
+                            Account: {userData?.virtualAccountNumber || userData?.accountNumber || transaction.senderAccountNumber}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
