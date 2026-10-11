@@ -16,6 +16,7 @@ import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { parseDataPlan } from "@/components/bills/types";
 import { ShareReceiptModal } from "@/components/wallet/ShareReceiptModal";
 import { InvestmentPinModal } from "@/components/investment/InvestmentPinModal";
+import { ReportTransactionIssueModal, ReportDataPayload } from "@/components/wallet/ReportTransactionIssueModal";
 
 export interface Transaction {
   id: string;
@@ -119,18 +120,17 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [showShareModal, setShowShareModal] = useState(initialShowShareModal);
-  const [isReportDrawerOpen, setIsReportDrawerOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isReportPinModalOpen, setIsReportPinModalOpen] = useState(false);
-  const [selectedIssueCategory, setSelectedIssueCategory] = useState<string>("");
-  const [reportNote, setReportNote] = useState("");
+  const [pendingReportData, setPendingReportData] = useState<ReportDataPayload | null>(null);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   const { getBillerLogo, getBankLogo, getStoreLogo, banks } = useLogos();
   const { config } = useAppConfig();
   const { userData } = useAuth();
 
-  useModalBackHandler(Boolean(transaction) && !isReportDrawerOpen, onClose, "transaction-receipt-modal");
-  useModalBackHandler(isReportDrawerOpen, () => setIsReportDrawerOpen(false), "report-issue-drawer");
+  useModalBackHandler(Boolean(transaction) && !isReportModalOpen, onClose, "transaction-receipt-modal");
+  useModalBackHandler(isReportModalOpen, () => setIsReportModalOpen(false), "report-issue-modal");
 
   // Prevent background scrolling while modal is open
   useEffect(() => {
@@ -151,16 +151,14 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     }
   };
 
-  const handleOpenReportPinModal = () => {
-    if (!selectedIssueCategory) {
-      toast.error("Please select a report category.");
-      return;
-    }
-    setIsReportDrawerOpen(false);
+  const handleAuthorizeReportRequest = (data: ReportDataPayload) => {
+    setPendingReportData(data);
     setIsReportPinModalOpen(true);
   };
 
   const handleExecuteReportSubmission = async (pin?: string, isBiometricAuthenticated?: boolean) => {
+    if (!pendingReportData) return;
+
     setIsReportPinModalOpen(false);
     setIsSubmittingReport(true);
     toast.loading("Submitting transaction report...", { id: "trn-report" });
@@ -179,8 +177,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         },
         body: JSON.stringify({
           transaction,
-          issueCategory: selectedIssueCategory,
-          customNote: reportNote,
+          issueCategory: pendingReportData.issueCategory,
+          customNote: pendingReportData.customNote,
+          screenshotUrl: pendingReportData.screenshotUrl,
           pin,
           isBiometricAuthenticated,
         }),
@@ -191,8 +190,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
       if (res.ok && data.success) {
         toast.success("Your transaction report has been submitted successfully!");
-        setSelectedIssueCategory("");
-        setReportNote("");
+        setIsReportModalOpen(false);
+        setPendingReportData(null);
       } else {
         toast.error(data.error || "Failed to submit report.");
       }
@@ -633,7 +632,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           </div>
           <button
             type="button"
-            onClick={() => setIsReportDrawerOpen(true)}
+            onClick={() => setIsReportModalOpen(true)}
             className="w-10 h-10 rounded-full border border-red-200 bg-red-50/80 flex items-center justify-center text-red-600 hover:bg-red-100 active:scale-90 transition-all cursor-pointer shadow-3xs"
             title="Report Transaction Issue"
           >
@@ -1721,115 +1720,14 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           onPinSubmit={(pin, isBiometric) => handleExecuteReportSubmission(pin, isBiometric)}
         />
 
-        {/* Report Transaction Drawer Overlay */}
-        <AnimatePresence>
-          {isReportDrawerOpen && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsReportDrawerOpen(false)}
-                className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100008]"
-              />
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 28, stiffness: 300 }}
-                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-3xl p-6 z-[100009] space-y-4 font-hanken shadow-2xl text-black"
-              >
-                <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto" />
-
-                <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                  <div className="flex items-center gap-2 text-red-600">
-                    <span className="material-symbols-outlined text-2xl font-bold">flag</span>
-                    <h3 className="font-extrabold text-base text-black">Report Transaction Issue</h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsReportDrawerOpen(false)}
-                    className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-base font-bold">close</span>
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold text-gray-600 leading-relaxed">
-                    Select the issue option that describes what happened with this transaction:
-                  </p>
-
-                  {/* 5 Issue Options List */}
-                  <div className="space-y-2">
-                    {[
-                      "This Transaction received but not credited to balance",
-                      "This Transaction received credited to balance and reverse",
-                      "Scan Transaction",
-                      "Fraud Transaction",
-                      "I don't trust this Transaction",
-                    ].map((issue, idx) => {
-                      const isSelected = selectedIssueCategory === issue;
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setSelectedIssueCategory(issue)}
-                          className={cn(
-                            "w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer text-xs font-bold",
-                            isSelected
-                              ? "bg-red-50 border-red-300 text-red-700 shadow-2xs"
-                              : "bg-gray-50 border-gray-200/80 text-gray-800 hover:bg-gray-100"
-                          )}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <div className={cn(
-                              "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0",
-                              isSelected ? "border-red-600 bg-red-600 text-white" : "border-gray-300"
-                            )}>
-                              {isSelected && <span className="material-symbols-outlined text-[10px] font-black">check</span>}
-                            </div>
-                            <span>{issue}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="space-y-1.5 pt-1">
-                    <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">
-                      Additional Details (Optional)
-                    </label>
-                    <textarea
-                      value={reportNote}
-                      onChange={(e) => setReportNote(e.target.value)}
-                      placeholder="Add any extra notes or explanations for this report..."
-                      className="w-full h-20 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold outline-none focus:border-red-500 transition-all resize-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsReportDrawerOpen(false)}
-                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!selectedIssueCategory || isSubmittingReport}
-                    onClick={handleOpenReportPinModal}
-                    className="flex-1 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
-                  >
-                    <span>Authorize & Submit</span>
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
+        {/* Dedicated Report Transaction Issue Modal */}
+        <ReportTransactionIssueModal
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          transaction={transaction}
+          onAuthorizeAndSubmit={handleAuthorizeReportRequest}
+          isSubmitting={isSubmittingReport}
+        />
       </motion.div>
     </AnimatePresence>
   );

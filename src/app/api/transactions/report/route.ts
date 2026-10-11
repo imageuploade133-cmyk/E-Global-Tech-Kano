@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { transaction, issueCategory, customNote, pin, isBiometricAuthenticated } = body;
+    const { transaction, issueCategory, customNote, screenshotUrl, pin, isBiometricAuthenticated } = body;
 
     if (!transaction || !transaction.reference) {
       return NextResponse.json({ error: "Missing required transaction reference." }, { status: 400 });
@@ -25,6 +25,10 @@ export async function POST(req: Request) {
 
     if (!issueCategory || typeof issueCategory !== "string") {
       return NextResponse.json({ error: "Please select an issue category." }, { status: 400 });
+    }
+
+    if (!customNote || typeof customNote !== "string" || customNote.trim().length < 5) {
+      return NextResponse.json({ error: "Additional details are required. Please describe the transaction issue (at least 5 characters)." }, { status: 400 });
     }
 
     const userRef = adminDb.collection("users").doc(uid);
@@ -100,6 +104,7 @@ export async function POST(req: Request) {
       recipientName: transaction.recipientName || transaction.beneficiaryName || "N/A",
       issueCategory,
       customNote: String(customNote || "").trim().slice(0, 500),
+      screenshotUrl: typeof screenshotUrl === "string" && screenshotUrl.trim() ? screenshotUrl.trim() : null,
       status: "PENDING", // "PENDING", "RESOLVED", "DISMISSED"
       createdAt: nowIso,
       updatedAt: nowIso,

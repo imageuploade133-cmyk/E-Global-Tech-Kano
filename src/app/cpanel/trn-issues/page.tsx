@@ -29,6 +29,7 @@ interface TrnIssueReport {
   recipientName: string;
   issueCategory: string;
   customNote: string;
+  screenshotUrl?: string;
   status: "PENDING" | "RESOLVED" | "DISMISSED";
   createdAt: string;
 }
@@ -319,13 +320,38 @@ function CpanelTrnIssuesPageContent() {
                     </div>
                   </div>
 
-                  {/* Custom Note */}
-                  {report.customNote && (
-                    <div className="p-3 bg-red-50/60 border border-red-100/80 rounded-xl space-y-1">
-                      <span className="text-[9.5px] font-black uppercase text-red-600 tracking-wider block">User Provided Explanation</span>
-                      <p className="text-xs font-semibold text-red-950 italic">
-                        &quot;{report.customNote}&quot;
-                      </p>
+                  {/* Custom Note & Screenshot Proof */}
+                  {(report.customNote || report.screenshotUrl) && (
+                    <div className="p-3 bg-red-50/60 border border-red-100/80 rounded-xl space-y-2">
+                      {report.customNote && (
+                        <div className="space-y-0.5">
+                          <span className="text-[9.5px] font-black uppercase text-red-600 tracking-wider block">User Provided Explanation</span>
+                          <p className="text-xs font-semibold text-red-950 italic">
+                            &quot;{report.customNote}&quot;
+                          </p>
+                        </div>
+                      )}
+
+                      {report.screenshotUrl && (
+                        <div className="pt-1 space-y-1">
+                          <span className="text-[9.5px] font-black uppercase text-red-600 tracking-wider block">Proof Screenshot</span>
+                          <a
+                            href={report.screenshotUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 p-2 bg-white border border-red-200 rounded-lg hover:border-red-400 transition-all cursor-pointer group"
+                          >
+                            <img src={report.screenshotUrl} alt="Report Screenshot Proof" className="w-12 h-12 object-cover rounded-md border" />
+                            <div className="text-left">
+                              <p className="text-[11px] font-bold text-gray-800 group-hover:text-red-600 flex items-center gap-1">
+                                <span>View Full Screenshot</span>
+                                <span className="material-symbols-outlined text-xs">open_in_new</span>
+                              </p>
+                              <p className="text-[9.5px] text-gray-500 font-mono">i.ibb.co direct image</p>
+                            </div>
+                          </a>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
