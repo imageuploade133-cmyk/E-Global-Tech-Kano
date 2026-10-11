@@ -22,6 +22,7 @@ import { TransferLimitsSection } from "@/components/profile/TransferLimitsSectio
 import { ChangePinSection } from "@/components/profile/ChangePinSection";
 import { ChangePasswordSection } from "@/components/profile/ChangePasswordSection";
 import { PhoneNumberSection } from "@/components/profile/PhoneNumberSection";
+import { InvestmentPinModal } from "@/components/investment/InvestmentPinModal";
 
 export default function ProfilePage() {
   const { userData, user, loading, updateUserData } = useAuth();
@@ -68,6 +69,7 @@ export default function ProfilePage() {
   // Modal / Drawer States
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeletePinModalOpen, setIsDeletePinModalOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState("");
   const [isSubmittingDelete, setIsSubmittingDelete] = useState(false);
 
@@ -348,7 +350,17 @@ export default function ProfilePage() {
     await handleAppSignOut(router);
   };
 
-  const handleRequestAccountDeletion = async () => {
+  const handleOpenDeletePinModal = () => {
+    if (!deleteReason.trim()) {
+      toast.error("Please provide a reason for account deletion.");
+      return;
+    }
+    setIsDeleteModalOpen(false);
+    setIsDeletePinModalOpen(true);
+  };
+
+  const handleExecuteAccountDeletion = async (pin?: string, isBiometricAuthenticated?: boolean) => {
+    setIsDeletePinModalOpen(false);
     setIsSubmittingDelete(true);
     toast.loading("Submitting account deletion request...", { id: "delete-req" });
 
@@ -367,6 +379,8 @@ export default function ProfilePage() {
         body: JSON.stringify({
           action: "request",
           reason: deleteReason,
+          pin,
+          isBiometricAuthenticated,
         }),
       });
 
@@ -516,7 +530,7 @@ export default function ProfilePage() {
                   <span>Account Deletion Requested</span>
                 </div>
                 <p className="text-[11px] text-amber-700 font-medium">
-                  Your deletion request is currently under review by CPanel Administrators.
+                  Your account deletion request is currently pending approval.
                 </p>
                 <button
                   type="button"
@@ -556,6 +570,16 @@ export default function ProfilePage() {
         onConfirm={handleLogoutConfirm}
       />
 
+      {/* Account Deletion PIN / Biometric Authorization Modal */}
+      <InvestmentPinModal
+        isOpen={isDeletePinModalOpen}
+        onClose={() => setIsDeletePinModalOpen(false)}
+        title="Authorize Account Deletion"
+        description="Enter your 4-digit PIN to authorize account deletion request."
+        isSubmitting={isSubmittingDelete}
+        onPinSubmit={(pin, isBiometric) => handleExecuteAccountDeletion(pin, isBiometric)}
+      />
+
       {/* Account Deletion Request Drawer Modal */}
       <AnimatePresence>
         {isDeleteModalOpen && (
@@ -592,24 +616,24 @@ export default function ProfilePage() {
 
               <div className="space-y-3">
                 <p className="text-xs font-semibold text-gray-600 leading-relaxed">
-                  Submitting an account deletion request will notify CPanel Administrators to inspect and process your wallet termination.
+                  Submitting an account deletion request will submit your account for inspection and closure.
                 </p>
 
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">
-                    Reason for deletion (Optional)
+                    Reason for deletion <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
-                    placeholder="Tell us why you want to delete your account..."
+                    placeholder="Please state why you want to delete your account (Required)..."
                     className="w-full h-24 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold outline-none focus:border-red-500 transition-all resize-none"
                   />
                 </div>
 
                 <div className="p-3 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-2.5 text-red-800 text-[11px] font-semibold">
                   <span className="material-symbols-outlined text-lg shrink-0">info</span>
-                  <span>Once requested, administrators will process account closure and settle any remaining balance.</span>
+                  <span>You will be prompted to enter your 4-digit transaction PIN / 2FA OTP to authorize this request.</span>
                 </div>
               </div>
 
@@ -623,15 +647,11 @@ export default function ProfilePage() {
                 </button>
                 <button
                   type="button"
-                  disabled={isSubmittingDelete}
-                  onClick={handleRequestAccountDeletion}
-                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+                  disabled={!deleteReason.trim() || isSubmittingDelete}
+                  onClick={handleOpenDeletePinModal}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
                 >
-                  {isSubmittingDelete ? (
-                    <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
-                  ) : (
-                    <span>Submit Request</span>
-                  )}
+                  <span>Authorize Request</span>
                 </button>
               </div>
             </motion.div>
