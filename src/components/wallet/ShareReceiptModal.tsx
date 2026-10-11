@@ -52,6 +52,58 @@ export const ShareReceiptModal: React.FC<ShareReceiptModalProps> = ({
 
   if (!isOpen || !transaction) return null;
 
+  const sanitizeCssString = (css: string): string => {
+    if (!css) return "";
+    return css
+      .replace(/oklab\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
+      .replace(/oklch\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
+      .replace(/lab\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
+      .replace(/lch\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
+      .replace(/color\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)");
+  };
+
+  const onCloneReceiptForHtml2Canvas = (clonedDoc: Document) => {
+    const styleElements = clonedDoc.querySelectorAll("style");
+    styleElements.forEach((style) => {
+      try {
+        if (style.innerHTML) style.innerHTML = sanitizeCssString(style.innerHTML);
+        if (style.textContent) style.textContent = sanitizeCssString(style.textContent);
+      } catch {}
+    });
+
+    try {
+      Array.from(clonedDoc.styleSheets).forEach((sheet) => {
+        try {
+          const rules = Array.from(sheet.cssRules || []);
+          rules.forEach((rule) => {
+            if (rule.cssText && /(oklab|oklch|lab|lch|color)\(/i.test(rule.cssText)) {
+              const styleRule = rule as CSSStyleRule;
+              if (styleRule.style && styleRule.style.cssText) {
+                styleRule.style.cssText = sanitizeCssString(styleRule.style.cssText);
+              }
+            }
+          });
+        } catch {}
+      });
+    } catch {}
+
+    const UNSUPPORTED_PATTERN = /(oklab|oklch|lab|lch|color)\(/i;
+    const clonedElements = clonedDoc.querySelectorAll("*");
+    clonedElements.forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      if (htmlEl.hasAttribute("style")) {
+        const rawStyle = htmlEl.getAttribute("style");
+        if (rawStyle) htmlEl.setAttribute("style", sanitizeCssString(rawStyle));
+      }
+      try {
+        const computed = window.getComputedStyle(htmlEl);
+        if (UNSUPPORTED_PATTERN.test(computed.backgroundColor)) htmlEl.style.backgroundColor = "transparent";
+        if (UNSUPPORTED_PATTERN.test(computed.color)) htmlEl.style.color = "#000000";
+        if (UNSUPPORTED_PATTERN.test(computed.borderColor)) htmlEl.style.borderColor = "#E2E8F0";
+      } catch {}
+    });
+  };
+
   const generateReceiptBlob = async (): Promise<Blob | null> => {
     if (!shareReceiptRef.current) return null;
     try {
@@ -61,6 +113,7 @@ export const ShareReceiptModal: React.FC<ShareReceiptModalProps> = ({
         allowTaint: true,
         backgroundColor: "#ffffff",
         logging: false,
+        onclone: onCloneReceiptForHtml2Canvas,
       });
       return new Promise<Blob | null>((resolve) => {
         canvas.toBlob((blob) => resolve(blob), "image/png", 0.95);
