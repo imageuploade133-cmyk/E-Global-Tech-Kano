@@ -4994,6 +4994,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       fee={trfFee}
       totalDebit={trfTotalDebit}
       walletBalance={balance}
+      remainingFreeTransfers={(trfFeeData as any)?.remainingFreeTransfers}
+      showFreeIndicator={(trfFeeData as any)?.showFreeIndicator !== false}
       onClose={() => setIsTrfPinModalOpen(false)}
       onExecuteTransfer={(pin, isBiometric) => {
         setIsTrfPinModalOpen(false);

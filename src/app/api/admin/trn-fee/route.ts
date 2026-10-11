@@ -6,6 +6,7 @@ export const DEFAULT_TRN_FEE_CONFIG = {
   enableTransferFee: true, // ON/OFF toggle for transfer fees globally
   freeTransfersQuota: 0, // Number of free transfers allowed per user before charging
   freeTransferResetPeriod: "NEVER", // "DAILY" | "WEEKLY" | "MONTHLY" | "NEVER"
+  showFreeTransfersIndicator: true, // ON/OFF toggle to indicate remaining free transfers to user in UI
   flatFee: 10.00, // Default base fee when transfer fee is enabled
   waiveMarkupOnFree: true, // Waive admin commission markup on free transfers
 };
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
       enableTransferFee,
       freeTransfersQuota,
       freeTransferResetPeriod,
+      showFreeTransfersIndicator,
       flatFee,
       waiveMarkupOnFree,
     } = body;
@@ -57,6 +59,7 @@ export async function POST(req: Request) {
       freeTransferResetPeriod: ["DAILY", "WEEKLY", "MONTHLY", "NEVER"].includes(freeTransferResetPeriod)
         ? freeTransferResetPeriod
         : "NEVER",
+      showFreeTransfersIndicator: Boolean(showFreeTransfersIndicator),
       flatFee: Math.max(0, parseFloat(String(flatFee)) || 0),
       waiveMarkupOnFree: waiveMarkupOnFree !== false,
       updatedAt: new Date().toISOString(),

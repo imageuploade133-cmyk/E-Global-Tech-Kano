@@ -25,6 +25,7 @@ function CpanelTrnFeePageContent() {
   const [enableTransferFee, setEnableTransferFee] = useState(true);
   const [freeTransfersQuota, setFreeTransfersQuota] = useState(0);
   const [freeTransferResetPeriod, setFreeTransferResetPeriod] = useState<"DAILY" | "WEEKLY" | "MONTHLY" | "NEVER">("NEVER");
+  const [showFreeTransfersIndicator, setShowFreeTransfersIndicator] = useState(true);
   const [flatFee, setFlatFee] = useState(10.00);
   const [waiveMarkupOnFree, setWaiveMarkupOnFree] = useState(true);
 
@@ -46,6 +47,7 @@ function CpanelTrnFeePageContent() {
         setEnableTransferFee(data.config.enableTransferFee !== false);
         setFreeTransfersQuota(Number(data.config.freeTransfersQuota) || 0);
         setFreeTransferResetPeriod(data.config.freeTransferResetPeriod || "NEVER");
+        setShowFreeTransfersIndicator(data.config.showFreeTransfersIndicator !== false);
         setFlatFee(Number(data.config.flatFee) || 0);
         setWaiveMarkupOnFree(data.config.waiveMarkupOnFree !== false);
       } else {
@@ -75,6 +77,7 @@ function CpanelTrnFeePageContent() {
           enableTransferFee,
           freeTransfersQuota,
           freeTransferResetPeriod,
+          showFreeTransfersIndicator,
           flatFee,
           waiveMarkupOnFree,
         }),
@@ -258,13 +261,38 @@ function CpanelTrnFeePageContent() {
                 </div>
               </div>
 
+              {/* Show Free Transfers Indicator to User Toggle */}
+              <div className="pt-3 border-t border-gray-200/40 flex items-center justify-between">
+                <div>
+                  <label className="text-xs font-extrabold uppercase block flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">visibility</span>
+                    Show Remaining Free Transfers Indicator to User
+                  </label>
+                  <span className="text-[10px] text-gray-400 block mt-0.5">
+                    ON/OFF toggle to show or hide the &quot;X Free Transfers Remaining&quot; badge to users on transfer modals.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFreeTransfersIndicator(!showFreeTransfersIndicator)}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-xl font-black text-xs uppercase transition-all border cursor-pointer shrink-0 ml-3",
+                    showFreeTransfersIndicator
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
+                      : "bg-gray-100 border-gray-200 text-gray-500"
+                  )}
+                >
+                  {showFreeTransfersIndicator ? "INDICATOR ON" : "INDICATOR OFF"}
+                </button>
+              </div>
+
               {/* Waive Admin Commission Toggle */}
-              <div className="pt-2 border-t border-gray-200/40 flex items-center justify-between">
+              <div className="pt-3 border-t border-gray-200/40 flex items-center justify-between">
                 <div>
                   <label className="text-xs font-extrabold uppercase block">
                     Waive Commission Markup on Free Transfers
                   </label>
-                  <span className="text-[10px] text-gray-400 block">
+                  <span className="text-[10px] text-gray-400 block mt-0.5">
                     Automatically set admin commission markup to ₦0.00 when transfer is within free quota
                   </span>
                 </div>
@@ -272,7 +300,7 @@ function CpanelTrnFeePageContent() {
                   type="button"
                   onClick={() => setWaiveMarkupOnFree(!waiveMarkupOnFree)}
                   className={cn(
-                    "px-3 py-1.5 rounded-xl font-bold text-xs uppercase transition-all border cursor-pointer",
+                    "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase transition-all border cursor-pointer shrink-0 ml-3",
                     waiveMarkupOnFree
                       ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
                       : "bg-gray-100 border-gray-200 text-gray-600"
