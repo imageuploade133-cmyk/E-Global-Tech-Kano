@@ -46,8 +46,8 @@ export const ShareReceiptModal: React.FC<ShareReceiptModalProps> = ({
   const [isPdfDrawerOpen, setIsPdfDrawerOpen] = useState(false);
   const { config } = useAppConfig();
 
-  // Intercept mobile/hardware back button
-  useModalBackHandler(isOpen && !isPdfDrawerOpen, onClose, "share-receipt-modal");
+  // Intercept mobile/hardware back button safely using stacked history
+  useModalBackHandler(isOpen, onClose, "share-receipt-modal");
   useModalBackHandler(isPdfDrawerOpen, () => setIsPdfDrawerOpen(false), "pdf-options-drawer");
 
   if (!isOpen || !transaction) return null;
