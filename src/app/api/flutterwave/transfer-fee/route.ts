@@ -40,6 +40,7 @@ export async function GET(req: Request) {
     let enableTransferFee = true;
     let freeTransfersQuota = 0;
     let freeTransferResetPeriod = "NEVER";
+    let showFreeTransfersIndicator = true;
 
     const trnFeeRef = adminDb.collection("config").doc("trn_fee_config");
     const trnFeeSnap = await trnFeeRef.get();
@@ -48,6 +49,7 @@ export async function GET(req: Request) {
       enableTransferFee = feeData.enableTransferFee !== false;
       freeTransfersQuota = Math.max(0, Number(feeData.freeTransfersQuota) || 0);
       freeTransferResetPeriod = feeData.freeTransferResetPeriod || "NEVER";
+      showFreeTransfersIndicator = feeData.showFreeTransfersIndicator !== false;
     }
 
     // Check if global transfer fees are completely OFF
@@ -61,6 +63,7 @@ export async function GET(req: Request) {
         totalDebit: amount,
         isFreeTransfer: true,
         freeReason: "Global transfer fees disabled by administrator",
+        showFreeIndicator: showFreeTransfersIndicator,
       });
     }
 
@@ -101,6 +104,7 @@ export async function GET(req: Request) {
             isFreeTransfer: true,
             freeReason: `Free transfer quota (${freeTransfersQuota - usedFreeCount} remaining)`,
             remainingFreeTransfers: freeTransfersQuota - usedFreeCount,
+            showFreeIndicator: showFreeTransfersIndicator,
           });
         }
       }

@@ -18,6 +18,8 @@ export interface AuthorizeTransactionModalProps {
   fee: number;
   totalDebit: number;
   walletBalance: number;
+  remainingFreeTransfers?: number;
+  showFreeIndicator?: boolean;
   onClose: () => void;
   onExecuteTransfer: (pin?: string, isBiometricAuthenticated?: boolean) => void;
 }
@@ -31,6 +33,8 @@ export const AuthorizeTransactionModal: React.FC<AuthorizeTransactionModalProps>
   fee,
   totalDebit,
   walletBalance,
+  remainingFreeTransfers,
+  showFreeIndicator = true,
   onClose,
   onExecuteTransfer,
 }) => {
@@ -185,9 +189,16 @@ export const AuthorizeTransactionModal: React.FC<AuthorizeTransactionModalProps>
 
                       <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 text-xs">
                         <span className="text-gray-500 font-semibold">Transfer Fee:</span>
-                        <span className="font-mono font-bold text-gray-700">
-                          {fee > 0 ? `₦${fee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : "₦0.00 (Free)"}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-gray-700">
+                            {fee > 0 ? `₦${fee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : "₦0.00 (Free)"}
+                          </span>
+                          {fee === 0 && showFreeIndicator && typeof remainingFreeTransfers === "number" && remainingFreeTransfers > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 uppercase tracking-wider">
+                              {remainingFreeTransfers} Free Left
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex justify-between items-center border-t border-gray-200/60 pt-2 font-bold text-gray-800">
