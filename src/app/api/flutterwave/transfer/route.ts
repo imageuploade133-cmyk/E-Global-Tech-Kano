@@ -651,6 +651,18 @@ export async function POST(req: Request) {
 
           refundAmountForNotification = exactRefundAmount;
 
+          // If the transfer was free (origFee === 0), restore the user's usedFreeTransfers quota count
+          const isWasFreeTransfer = origData.fee === 0 || origData.isFreeTransfer === true || isFreeTransfer;
+          if (isWasFreeTransfer) {
+            const currentUsedFree = Number(uData.usedFreeTransfers) || 0;
+            if (currentUsedFree > 0) {
+              rollbackTx.update(userRef, {
+                usedFreeTransfers: currentUsedFree - 1
+              });
+              console.log(`[Transfer Rollback] Restored free transfer quota for user ${uid}. Decremented usedFreeTransfers from ${currentUsedFree} to ${currentUsedFree - 1}`);
+            }
+          }
+
           await WalletService.creditWallet(rollbackTx, {
             userId: uid,
             amount: origAmount,
