@@ -122,10 +122,13 @@ export default function GlobalDeductionsPage() {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
 
-  // Detail Drawer State
+  // Detail Drawer State with Index Pagination
   const [selectedDeduction, setSelectedDeduction] = useState<GlobalDeduction | null>(null);
   const [userRecords, setUserRecords] = useState<UserDeductionRecord[]>([]);
   const [isLoadingUserRecords, setIsLoadingUserRecords] = useState(false);
+  const [userRecordsPage, setUserRecordsPage] = useState(1);
+  const [userRecordsTotalPages, setUserRecordsTotalPages] = useState(1);
+  const [userRecordsTotalCount, setUserRecordsTotalCount] = useState(0);
 
   // Delete Authorization Modal State
   const [deleteDeduction, setDeleteDeduction] = useState<GlobalDeduction | null>(null);
@@ -313,14 +316,19 @@ export default function GlobalDeductionsPage() {
     }
   };
 
-  const handleViewUserRecords = async (ded: GlobalDeduction) => {
+  const handleViewUserRecords = async (ded: GlobalDeduction, pageNum = 1) => {
     setSelectedDeduction(ded);
+    setUserRecordsPage(pageNum);
     setIsLoadingUserRecords(true);
     try {
-      const res = await fetch(`/api/admin/deductions?deductionId=${ded.deductionId}`);
+      const res = await fetch(`/api/admin/deductions?deductionId=${ded.deductionId}&page=${pageNum}&limit=15`);
       const data = await res.json();
       if (res.ok && data.success) {
         setUserRecords(data.userRecords || []);
+        if (data.pagination) {
+          setUserRecordsTotalPages(data.pagination.totalPages);
+          setUserRecordsTotalCount(data.pagination.totalRecords);
+        }
       } else {
         toast.error(data.error || "Failed to fetch user audit logs");
       }
@@ -1104,51 +1112,78 @@ export default function GlobalDeductionsPage() {
                 ) : userRecords.length === 0 ? (
                   <div className="p-8 text-center text-gray-400 text-xs">No per-user audit records found for this deduction.</div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="border-b text-[10px] font-black uppercase tracking-wider text-gray-400 border-gray-100 dark:border-gray-800">
-                          <th className="py-2.5 px-3">User</th>
-                          <th className="py-2.5 px-3">Assessed</th>
-                          <th className="py-2.5 px-3">Recovered</th>
-                          <th className="py-2.5 px-3">Outstanding Debt</th>
-                          <th className="py-2.5 px-3">Net Position After</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs font-medium">
-                        {userRecords.map((ur) => {
-                          const assessed = ur.amountAssessed ?? 0;
-                          const recovered = ur.amountRecovered ?? 0;
-                          const outstanding = ur.amountOutstanding ?? 0;
-                          const balAfter = ur.walletBalanceAfter ?? 0;
-                          const netAfter = balAfter - outstanding;
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b text-[10px] font-black uppercase tracking-wider text-gray-400 border-gray-100 dark:border-gray-800">
+                            <th className="py-2.5 px-3">User</th>
+                            <th className="py-2.5 px-3">Assessed</th>
+                            <th className="py-2.5 px-3">Recovered</th>
+                            <th className="py-2.5 px-3">Outstanding Debt</th>
+                            <th className="py-2.5 px-3">Net Position After</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs font-medium">
+                          {userRecords.map((ur) => {
+                            const assessed = ur.amountAssessed ?? 0;
+                            const recovered = ur.amountRecovered ?? 0;
+                            const outstanding = ur.amountOutstanding ?? 0;
+                            const balAfter = ur.walletBalanceAfter ?? 0;
+                            const netAfter = balAfter - outstanding;
 
-                          return (
-                            <tr key={ur.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                              <td className="py-2.5 px-3">
-                                <div className="font-bold text-gray-900 dark:text-white">{ur.userName || "User"}</div>
-                                <div className="text-[10px] text-gray-400">{ur.userEmail || ur.userPhone || ur.userId}</div>
-                              </td>
-                              <td className="py-2.5 px-3 font-semibold text-gray-800 dark:text-gray-200">
-                                ₦{assessed.toLocaleString()}
-                              </td>
-                              <td className="py-2.5 px-3 font-bold text-emerald-600">
-                                ₦{recovered.toLocaleString()}
-                              </td>
-                              <td className="py-2.5 px-3 font-bold text-amber-500">
-                                ₦{outstanding.toLocaleString()}
-                              </td>
-                              <td className="py-2.5 px-3 font-mono font-bold">
-                                <span className={netAfter < 0 ? "text-rose-500" : "text-emerald-600"}>
-                                  ₦{netAfter.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                            return (
+                              <tr key={ur.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
+                                <td className="py-2.5 px-3">
+                                  <div className="font-bold text-gray-900 dark:text-white">{ur.userName || "User"}</div>
+                                  <div className="text-[10px] text-gray-400">{ur.userEmail || ur.userPhone || ur.userId}</div>
+                                </td>
+                                <td className="py-2.5 px-3 font-semibold text-gray-800 dark:text-gray-200">
+                                  ₦{assessed.toLocaleString()}
+                                </td>
+                                <td className="py-2.5 px-3 font-bold text-emerald-600">
+                                  ₦{recovered.toLocaleString()}
+                                </td>
+                                <td className="py-2.5 px-3 font-bold text-amber-500">
+                                  ₦{outstanding.toLocaleString()}
+                                </td>
+                                <td className="py-2.5 px-3 font-mono font-bold">
+                                  <span className={netAfter < 0 ? "text-rose-500" : "text-emerald-600"}>
+                                    ₦{netAfter.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Per-User Audit Logs Index Pagination */}
+                    <div className="p-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs font-bold text-gray-500">
+                      <span>
+                        Page {userRecordsPage} of {userRecordsTotalPages} ({userRecordsTotalCount} user records)
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          disabled={userRecordsPage <= 1 || isLoadingUserRecords}
+                          onClick={() => handleViewUserRecords(selectedDeduction, userRecordsPage - 1)}
+                          className="px-3 py-1 rounded-xl border border-gray-200 dark:border-gray-700 disabled:opacity-40 font-black cursor-pointer"
+                        >
+                          ← Prev
+                        </button>
+
+                        <button
+                          disabled={userRecordsPage >= userRecordsTotalPages || isLoadingUserRecords}
+                          onClick={() => handleViewUserRecords(selectedDeduction, userRecordsPage + 1)}
+                          className="px-3 py-1 rounded-xl border border-gray-200 dark:border-gray-700 disabled:opacity-40 font-black cursor-pointer"
+                        >
+                          Next →
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
             </motion.div>
