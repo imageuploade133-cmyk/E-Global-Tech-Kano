@@ -235,6 +235,9 @@ export async function GET(req: Request) {
         livenessChallenge: data.livenessChallenge || null,
         kycVerifiedAt: data.kycVerifiedAt || null,
         photoURL: data.photoURL || data.avatarUrl || data.profileImage || data.photoUrl || null,
+        idCardUrl: data.idCardUrl || data.idDocumentUrl || data.kycIdCardUrl || data.documentUrl || null,
+        utilityBillUrl: data.utilityBillUrl || data.proofOfAddressUrl || data.kycUtilityBillUrl || null,
+        proofOfAddressUrl: data.proofOfAddressUrl || data.utilityBillUrl || null,
         virtualAccountNumber: data.virtualAccountNumber || data.accountNumber || "",
         virtualAccountBankName: data.virtualAccountBankName || data.bankName || "",
         balance: Number(data.balance) || 0
