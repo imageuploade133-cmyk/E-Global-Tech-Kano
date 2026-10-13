@@ -3,6 +3,7 @@ import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
 import React, { useState, useEffect } from "react";
 import { CpanelActionDropdown } from "@/components/cpanel/CpanelActionDropdown";
+import { KycImageViewerModal, KycDocumentImage } from "@/components/cpanel/KycImageViewerModal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
@@ -22,6 +23,9 @@ interface PendingKycUser {
   capturedSelfie?: string;
   livenessChallenge?: string;
   photoURL?: string;
+  idCardUrl?: string;
+  utilityBillUrl?: string;
+  proofOfAddressUrl?: string;
   virtualAccountNumber?: string;
   virtualAccountBankName?: string;
   balance?: number;
@@ -75,6 +79,21 @@ function CpanelKycPageContent() {
   const [editKycNumber, setEditKycNumber] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+  // Document Lightbox/Modal Viewer State
+  const [viewerModalState, setViewerModalState] = useState<{
+    isOpen: boolean;
+    images: KycDocumentImage[];
+    initialIndex: number;
+    userName: string;
+    userEmail: string;
+  }>({
+    isOpen: false,
+    images: [],
+    initialIndex: 0,
+    userName: "",
+    userEmail: "",
+  });
+
   const [adminActionModal, setAdminActionModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -90,6 +109,53 @@ function CpanelKycPageContent() {
     actionStyle: "danger",
     onConfirm: () => {},
   });
+
+  const openDocumentViewer = (u: PendingKycUser, startIndex = 0) => {
+    const imagesList: KycDocumentImage[] = [];
+
+    if (u.idCardUrl) {
+      imagesList.push({
+        title: `${(u.kycType || "bvn").toUpperCase()} / Govt ID Document`,
+        url: u.idCardUrl,
+        type: u.kycType,
+      });
+    }
+
+    if (u.capturedSelfie) {
+      imagesList.push({
+        title: "Biometric Verification Selfie",
+        url: u.capturedSelfie,
+        description: u.livenessChallenge ? `Liveness Challenge: ${u.livenessChallenge}` : undefined,
+      });
+    }
+
+    if (u.utilityBillUrl || u.proofOfAddressUrl) {
+      imagesList.push({
+        title: "Proof of Address / Utility Bill",
+        url: u.utilityBillUrl || u.proofOfAddressUrl!,
+      });
+    }
+
+    if (u.photoURL && !imagesList.some((img) => img.url === u.photoURL)) {
+      imagesList.push({
+        title: "Profile Avatar Photo",
+        url: u.photoURL,
+      });
+    }
+
+    if (imagesList.length === 0) {
+      toast.info("No high-resolution KYC images available for this customer.");
+      return;
+    }
+
+    setViewerModalState({
+      isOpen: true,
+      images: imagesList,
+      initialIndex: Math.min(startIndex, imagesList.length - 1),
+      userName: u.name,
+      userEmail: u.email,
+    });
+  };
 
   const triggerAdminConfirm = (
     title: string,
@@ -538,17 +604,66 @@ function CpanelKycPageContent() {
                       </div>
                     </div>
 
-                    {/* Selfie & Liveness Media */}
-                    {(u.capturedSelfie || u.livenessChallenge) && (
-                      <div className={cn("p-2.5 rounded-xl border flex items-center gap-3", isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200")}>
-                        {u.capturedSelfie && (
-                          <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 shrink-0 bg-gray-100">
-                            <img src={u.capturedSelfie} alt="Selfie" className="w-full h-full object-cover" />
-                          </div>
-                        )}
-                        <div className="text-left space-y-0.5 text-[10px]">
-                          <p className="font-extrabold uppercase text-[#FC7A00]">Biometric Selfie Verification</p>
-                          {u.livenessChallenge && <p className="text-gray-400 font-semibold">Challenge: <span className="font-mono text-white">{u.livenessChallenge}</span></p>}
+                    {/* KYC Document Thumbnails & Inspection Bar */}
+                    {(u.capturedSelfie || u.idCardUrl || u.utilityBillUrl || u.proofOfAddressUrl || u.photoURL) && (
+                      <div className={cn("p-3 rounded-xl border space-y-2", isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200")}>
+                        <div className="flex items-center justify-between">
+                          <p className="font-extrabold text-[10px] uppercase tracking-wider text-[#FC7A00] flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">photo_library</span>
+                            <span>KYC Document Files</span>
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => openDocumentViewer(u, 0)}
+                            className="text-[10px] font-black uppercase text-emerald-500 hover:text-emerald-400 flex items-center gap-1 cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">zoom_in</span>
+                            <span>Inspect High-Res</span>
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                          {u.idCardUrl && (
+                            <button
+                              type="button"
+                              onClick={() => openDocumentViewer(u, 0)}
+                              className="relative w-14 h-14 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700 shrink-0 group cursor-pointer"
+                              title="Govt ID Card"
+                            >
+                              <img src={u.idCardUrl} alt="ID Card" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] font-black uppercase text-white text-center py-0.5">
+                                ID Card
+                              </span>
+                            </button>
+                          )}
+
+                          {u.capturedSelfie && (
+                            <button
+                              type="button"
+                              onClick={() => openDocumentViewer(u, u.idCardUrl ? 1 : 0)}
+                              className="relative w-14 h-14 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700 shrink-0 group cursor-pointer"
+                              title="Biometric Selfie"
+                            >
+                              <img src={u.capturedSelfie} alt="Selfie" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] font-black uppercase text-white text-center py-0.5">
+                                Selfie
+                              </span>
+                            </button>
+                          )}
+
+                          {(u.utilityBillUrl || u.proofOfAddressUrl) && (
+                            <button
+                              type="button"
+                              onClick={() => openDocumentViewer(u, (u.idCardUrl ? 1 : 0) + (u.capturedSelfie ? 1 : 0))}
+                              className="relative w-14 h-14 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700 shrink-0 group cursor-pointer"
+                              title="Utility Bill / Address Proof"
+                            >
+                              <img src={u.utilityBillUrl || u.proofOfAddressUrl} alt="Utility Bill" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] font-black uppercase text-white text-center py-0.5">
+                                Address
+                              </span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -582,6 +697,12 @@ function CpanelKycPageContent() {
                       <CpanelActionDropdown
                         isDark={isDark}
                         actions={[
+                          {
+                            label: "Inspect High-Res Images",
+                            icon: "preview",
+                            variant: "emerald",
+                            onClick: () => openDocumentViewer(u, 0),
+                          },
                           {
                             label: "View Account Info",
                             icon: "info",
@@ -1050,6 +1171,18 @@ function CpanelKycPageContent() {
           </div>
         </div>
       )}
+
+      {/* High-Resolution KYC Image Inspection Lightbox Modal */}
+      <KycImageViewerModal
+        key={`${viewerModalState.userName}-${viewerModalState.initialIndex}`}
+        isOpen={viewerModalState.isOpen}
+        images={viewerModalState.images}
+        initialIndex={viewerModalState.initialIndex}
+        userName={viewerModalState.userName}
+        userEmail={viewerModalState.userEmail}
+        isDark={isDark}
+        onClose={() => setViewerModalState((prev) => ({ ...prev, isOpen: false }))}
+      />
 
       {/* Confirmation Modal */}
       {adminActionModal.isOpen && (
