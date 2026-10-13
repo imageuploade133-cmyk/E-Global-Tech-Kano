@@ -9,7 +9,7 @@ import { TransactionReceipt, Transaction } from "@/components/wallet/Transaction
 import { TransactionIcon } from "@/components/wallet/TransactionIcon";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { db } from "@/lib/firebase";
-import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, getDocs, startAfter, onSnapshot, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { toast } from "sonner";
 import { getTransactionLedgerStatus, isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
 import { StatementModal } from "@/components/history/StatementModal";
@@ -151,6 +151,30 @@ export const ActivityLogContainer: React.FC = () => {
     }
   };
 
+  const parseTransactionDoc = (docSnap: QueryDocumentSnapshot<DocumentData> | DocumentData): Transaction => {
+    const data = typeof docSnap.data === "function" ? docSnap.data() : docSnap;
+    const id = docSnap.id || data.id || data.reference;
+    return {
+      ...data,
+      id,
+      reference: data.reference || id,
+      type: data.type || "DEPOSIT",
+      amount: Number(data.amount) || 0,
+      currency: data.currency || "NGN",
+      description: data.description || "",
+      recipientName: data.recipientName || "",
+      bankName: data.bankName || "",
+      status: data.status || "PENDING",
+      date: data.date || "",
+      time: data.time || "",
+      fee: Number(data.fee) || 0,
+      vat: Number(data.vat) || 0,
+      markup: Number(data.markup) || 0,
+      totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
+      totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
+    };
+  };
+
   useEffect(() => {
     fetchInitialTransactions();
 
@@ -186,6 +210,88 @@ export const ActivityLogContainer: React.FC = () => {
 
     fetchMonthlyTotal();
 
+    // Attach real-time listener for the initial batch to instantly capture delayed reconciliation updates
+    let unsubscribe: (() => void) | null = null;
+    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+
+    if (!isMock && user) {
+      try {
+        const q = query(
+          collection(db, "transactions"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(15)
+        );
+
+        unsubscribe = onSnapshot(
+          q,
+          (snap) => {
+            const snapshotList: Transaction[] = [];
+            snap.forEach((docSnap) => {
+              snapshotList.push(parseTransactionDoc(docSnap));
+            });
+
+            setTransactions((prev) => {
+              const txMap = new Map<string, Transaction>();
+
+              // Load new snapshot docs first
+              snapshotList.forEach((tx) => {
+                txMap.set(tx.id, tx);
+              });
+
+              // Keep any pagination pages loaded earlier if not present in current snapshot
+              prev.forEach((tx) => {
+                if (!txMap.has(tx.id)) {
+                  txMap.set(tx.id, tx);
+                }
+              });
+
+              const merged = Array.from(txMap.values()).sort((a, b) => {
+                const tA = new Date(a.createdAt || 0).getTime();
+                const tB = new Date(b.createdAt || 0).getTime();
+                return tB - tA;
+              });
+
+              // Keep sessionStorage cache synchronized with updated records
+              if (typeof window !== "undefined") {
+                try {
+                  sessionStorage.setItem(
+                    `history_transactions_cache_${user.uid}`,
+                    JSON.stringify({ data: merged.slice(0, 15), hasMore: snap.docs.length >= 15, timestamp: Date.now() })
+                  );
+                } catch {
+                  // Ignore storage write error
+                }
+              }
+
+              return merged;
+            });
+
+            // If a receipt drawer is open, keep its details updated dynamically
+            setSelectedTx((currentSelected) => {
+              if (!currentSelected) return null;
+              const updated = snapshotList.find((t) => t.id === currentSelected.id || t.reference === currentSelected.reference);
+              if (updated && (updated.status !== currentSelected.status || updated.totalCredited !== currentSelected.totalCredited)) {
+                return updated;
+              }
+              return currentSelected;
+            });
+
+            if (snap.docs.length > 0) {
+              setLastVisibleDoc(snap.docs[snap.docs.length - 1]);
+            }
+            setHasMore(snap.docs.length >= 15);
+            setLoading(false);
+          },
+          (error) => {
+            console.warn("[ActivityLogContainer onSnapshot Warning]:", error?.message || error);
+          }
+        );
+      } catch (err: any) {
+        console.warn("[ActivityLogContainer Setup Listener Exception]:", err?.message || err);
+      }
+    }
+
     const handleAppRefresh = () => {
       fetchInitialTransactions(true);
       fetchMonthlyTotal();
@@ -194,6 +300,9 @@ export const ActivityLogContainer: React.FC = () => {
     window.addEventListener("app-refresh", handleAppRefresh);
     return () => {
       window.removeEventListener("app-refresh", handleAppRefresh);
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, [user]);
 

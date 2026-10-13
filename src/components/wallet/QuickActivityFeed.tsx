@@ -9,7 +9,7 @@ import { TransactionIcon } from "./TransactionIcon";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, getDocs, onSnapshot } from "firebase/firestore";
 import { getTransactionLedgerStatus, isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
 
 interface QuickActivityFeedProps {
@@ -156,6 +156,67 @@ export const QuickActivityFeed: React.FC<QuickActivityFeedProps> = ({ isLoading:
   useEffect(() => {
     fetchRecentTransactions();
 
+    let unsubscribe: (() => void) | null = null;
+    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+
+    if (!isMock && user) {
+      try {
+        const q = query(
+          collection(db, "transactions"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(15)
+        );
+
+        unsubscribe = onSnapshot(
+          q,
+          (snapshot) => {
+            const list: Transaction[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data();
+              list.push({
+                ...data,
+                id: docSnap.id,
+                reference: data.reference || docSnap.id,
+                type: data.type || "DEPOSIT",
+                amount: Number(data.amount) || 0,
+                currency: data.currency || "NGN",
+                description: data.description || "",
+                recipientName: data.recipientName || "",
+                bankName: data.bankName || "",
+                status: data.status || "SUCCESS",
+                date: data.date || "",
+                time: data.time || "",
+                fee: Number(data.fee) || 0,
+                vat: Number(data.vat) || 0,
+                markup: Number(data.markup) || 0,
+                totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
+                totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
+              } as Transaction);
+            });
+
+            setTransactions(list);
+            if (typeof window !== "undefined") {
+              try {
+                sessionStorage.setItem(
+                  `${RECENT_TX_CACHE_KEY}_${user.uid}`,
+                  JSON.stringify({ data: list, timestamp: Date.now() })
+                );
+              } catch {
+                // Ignore cache write errors
+              }
+            }
+            setLoading(false);
+          },
+          (error) => {
+            console.warn("[QuickActivityFeed onSnapshot Warning]:", error?.message || error);
+          }
+        );
+      } catch (err: any) {
+        console.warn("[QuickActivityFeed Listener Exception]:", err?.message || err);
+      }
+    }
+
     const handleAppRefresh = () => {
       fetchRecentTransactions(true);
     };
@@ -163,6 +224,9 @@ export const QuickActivityFeed: React.FC<QuickActivityFeedProps> = ({ isLoading:
     window.addEventListener("app-refresh", handleAppRefresh);
     return () => {
       window.removeEventListener("app-refresh", handleAppRefresh);
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, [user]);
 
