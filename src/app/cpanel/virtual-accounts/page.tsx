@@ -355,39 +355,84 @@ export default function CpanelVirtualAccountsPage() {
                     {/* Virtual Account & Bank */}
                     <td className="p-4">
                       {item.virtualAccountNumber ? (
-                        <div>
-                          <div className="flex items-center gap-1.5 font-mono font-bold text-sm text-[#FC7A00]">
-                            <span>{item.virtualAccountNumber}</span>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-black text-sm tracking-wide text-[#FC7A00] select-all bg-orange-500/10 px-2 py-0.5 rounded-lg border border-[#FC7A00]/20 inline-block">
+                              {item.virtualAccountNumber}
+                            </span>
                             <button
-                              onClick={() => copyToClipboard(item.virtualAccountNumber, "Account Number")}
-                              className="text-gray-400 hover:text-[#FC7A00] transition-colors"
-                              title="Copy Account Number"
+                              type="button"
+                              onClick={() => copyToClipboard(item.virtualAccountNumber, "Full Account Number")}
+                              className="w-7 h-7 rounded-lg border border-gray-300 dark:border-gray-700 hover:border-[#FC7A00] bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:text-[#FC7A00] transition-all cursor-pointer active:scale-95 shrink-0"
+                              title="Copy Full Account Number"
                             >
-                              <span className="material-symbols-outlined text-sm">content_copy</span>
+                              <span className="material-symbols-outlined text-xs">content_copy</span>
                             </button>
                           </div>
-                          <div className={`text-xs font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                            {item.virtualAccountBankName || "Wema Bank"}
+
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-xs font-extrabold uppercase ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                              {item.virtualAccountBankName || "Wema Bank"}
+                            </span>
                           </div>
-                          <div className={`text-[10px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                            {item.virtualAccountName || item.name}
-                          </div>
+
+                          <p className={`text-[10px] font-medium truncate max-w-[220px] ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                            Acct Name: <span className="font-bold">{item.virtualAccountName || item.name}</span>
+                          </p>
                         </div>
                       ) : (
-                        <span className="text-gray-400 italic">No account assigned</span>
+                        <div className="flex items-center gap-1.5 text-gray-400 italic">
+                          <span className="material-symbols-outlined text-sm">link_off</span>
+                          <span>No Virtual Account Assigned</span>
+                        </div>
                       )}
                     </td>
 
                     {/* Provider & KYC */}
                     <td className="p-4">
-                      <div className="font-semibold uppercase text-[11px]">{item.virtualAccountProvider || "Flutterwave"}</div>
-                      <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                        item.kycStatus === "VERIFIED"
-                          ? "bg-emerald-500/10 text-emerald-500"
-                          : "bg-amber-500/10 text-amber-500"
-                      }`}>
-                        KYC: {item.kycStatus}
-                      </span>
+                      <div className="space-y-1.5">
+                        {(() => {
+                          const prov = (item.virtualAccountProvider || "").toLowerCase();
+                          const bank = (item.virtualAccountBankName || "").toLowerCase();
+
+                          let providerLabel = "Flutterwave Gateway Rail";
+                          let badgeBg = "bg-orange-500/10 text-orange-500 border-orange-500/20";
+
+                          if (prov === "squad" || prov === "squadco" || bank.includes("gtbank") || bank.includes("gtb") || bank.includes("squad")) {
+                            providerLabel = "Squadco (GTBank)";
+                            badgeBg = "bg-rose-500/10 text-rose-500 border-rose-500/20";
+                          } else if (prov === "paystack" || bank.includes("paystack")) {
+                            providerLabel = "Paystack Gateway";
+                            badgeBg = "bg-blue-500/10 text-blue-500 border-blue-500/20";
+                          } else if (prov === "monnify" || bank.includes("monnify")) {
+                            providerLabel = "Monnify Rail";
+                            badgeBg = "bg-amber-500/10 text-amber-500 border-amber-500/20";
+                          } else if (prov === "korapay" || bank.includes("kora")) {
+                            providerLabel = "Korapay Rail";
+                            badgeBg = "bg-indigo-500/10 text-indigo-500 border-indigo-500/20";
+                          } else if (prov === "flutterwave" || bank.includes("wema") || bank.includes("sterling")) {
+                            providerLabel = "Flutterwave Gateway";
+                            badgeBg = "bg-[#FC7A00]/10 text-[#FC7A00] border-[#FC7A00]/20";
+                          }
+
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${badgeBg}`}>
+                              <span className="material-symbols-outlined text-[13px]">account_balance_wallet</span>
+                              <span>{providerLabel}</span>
+                            </span>
+                          );
+                        })()}
+
+                        <div>
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${
+                            item.kycStatus === "VERIFIED"
+                              ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                          }`}>
+                            KYC: {item.kycStatus}
+                          </span>
+                        </div>
+                      </div>
                     </td>
 
                     {/* Balance */}
