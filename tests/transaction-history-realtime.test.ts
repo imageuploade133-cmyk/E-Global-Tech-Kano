@@ -204,6 +204,180 @@ describe("Transaction History Real-Time Status Updates & Cache Consistency", () 
     expect(getTransactionLedgerStatus(updatedHistory[18]).code).toBe("FAILED");
   });
 
+  it("4c. Realistic Firestore scenario: removed snapshot contains old PENDING status, getDoc fetches latest SUCCESS/FAILED", async () => {
+    // Older page transaction (index 18, page 2)
+    const page1And2History = Array.from({ length: 20 }, (_, i) => ({
+      id: `tx-page-${i + 1}`,
+      reference: `ref-page-${i + 1}`,
+      type: "DEPOSIT",
+      amount: 50000,
+      currency: "NGN",
+      status: i === 18 ? "PENDING" : "SUCCESS",
+      createdAt: new Date(Date.now() - (i + 1) * 3600000).toISOString(),
+    }));
+
+    // Selected transaction in receipt drawer
+    let selectedTx: any = { ...page1And2History[18] };
+
+    // Firestore listener 'removed' doc change with old PENDING state in snapshot
+    const removedDocChange = {
+      type: "removed",
+      doc: {
+        id: "tx-page-19",
+        reference: "ref-page-19",
+        type: "DEPOSIT",
+        amount: 50000,
+        currency: "NGN",
+        status: "PENDING", // Snapshot still says PENDING at time of query exit
+        createdAt: new Date(Date.now() - 19 * 3600000).toISOString(),
+        ref: "transactions/tx-page-19",
+      },
+    };
+
+    // Simulated getDoc resolver returning fresh terminal document
+    const mockGetDocResolver = async (ref: string) => {
+      if (ref === "transactions/tx-page-19") {
+        return {
+          exists: () => true,
+          data: () => ({
+            id: "tx-page-19",
+            reference: "ref-page-19",
+            type: "DEPOSIT",
+            amount: 50000,
+            currency: "NGN",
+            status: "SUCCESS",
+            totalCredited: 50000,
+            createdAt: new Date(Date.now() - 19 * 3600000).toISOString(),
+          }),
+        };
+      }
+      return { exists: () => false, data: () => null };
+    };
+
+    // Simulating pending listener processing algorithm
+    const removedDocIds = new Set<string>();
+    const removedTxMap = new Map<string, any>();
+
+    if (removedDocChange.type === "removed") {
+      const removedTx = { ...removedDocChange.doc };
+      removedDocIds.add(removedTx.id);
+      if (removedTx.reference) removedDocIds.add(removedTx.reference);
+
+      const statusUpper = (removedTx.status || "").toUpperCase();
+      const isStillPending = statusUpper === "PENDING" || statusUpper === "PROCESSING";
+
+      if (!isStillPending) {
+        removedTxMap.set(removedTx.id, removedTx);
+      } else {
+        const freshSnap = await mockGetDocResolver(removedDocChange.doc.ref);
+        if (freshSnap.exists()) {
+          const freshTx = freshSnap.data();
+          removedTxMap.set(freshTx.id, freshTx);
+          if (freshTx.reference) removedTxMap.set(freshTx.reference, freshTx);
+        }
+      }
+    }
+
+    const updatedList = page1And2History.map((tx) => {
+      const statusUpper = (tx.status || "").toUpperCase();
+      const isTxPending = statusUpper === "PENDING" || statusUpper === "PROCESSING";
+
+      if (isTxPending && (removedDocIds.has(tx.id) || (tx.reference && removedDocIds.has(tx.reference)))) {
+        const transitionMatch = removedTxMap.get(tx.id) || (tx.reference ? removedTxMap.get(tx.reference) : undefined);
+        if (transitionMatch) {
+          return {
+            ...tx,
+            ...transitionMatch,
+          };
+        }
+      }
+      return tx;
+    });
+
+    // Sync selectedTx receipt modal state
+    const updatedSelected = updatedList.find(
+      (t) => t.id === selectedTx.id || t.reference === selectedTx.reference
+    );
+    if (updatedSelected) {
+      selectedTx = updatedSelected;
+    }
+
+    // Monthly credit total recalculation check
+    const newMonthlyCreditTotal = updatedList.reduce((acc, tx) => {
+      const isSuccess = (tx.status || "").toUpperCase() === "SUCCESS";
+      return isSuccess && isCreditTransaction(tx) ? acc + getTransactionDisplayAmount(tx) : acc;
+    }, 0);
+
+    expect(updatedList.length).toBe(20); // No duplicate rows created
+    expect(updatedList[18].status).toBe("SUCCESS");
+    expect(selectedTx.status).toBe("SUCCESS");
+    expect(getTransactionLedgerStatus(selectedTx).code).toBe("CREDITED");
+    expect(newMonthlyCreditTotal).toBe(20 * 50000); // All 20 items are now SUCCESS credited
+  });
+
+  it("4d. Safely ignores deleted documents and documents that remain pending without corrupting status", async () => {
+    const history = [
+      { id: "tx-deleted", reference: "ref-deleted", status: "PENDING", amount: 10000, type: "DEPOSIT" },
+      { id: "tx-still-pending", reference: "ref-still-pending", status: "PENDING", amount: 20000, type: "DEPOSIT" },
+    ];
+
+    // Mock getDoc for a deleted document (freshSnap.exists() === false)
+    const mockGetDocDeleted = async () => ({
+      exists: () => false,
+      data: () => null,
+    });
+
+    // Mock getDoc for document that somehow returned still pending
+    const mockGetDocPending = async () => ({
+      exists: () => true,
+      data: () => ({ id: "tx-still-pending", reference: "ref-still-pending", status: "PENDING", amount: 20000, type: "DEPOSIT" }),
+    });
+
+    const removedDocIds = new Set<string>();
+    const removedTxMap = new Map<string, any>();
+
+    // Case A: Deleted Document
+    removedDocIds.add("tx-deleted");
+    const freshDeletedSnap = await mockGetDocDeleted();
+    if (freshDeletedSnap.exists()) {
+      const freshTx = freshDeletedSnap.data();
+      removedTxMap.set(freshTx.id, freshTx);
+    }
+
+    // Case B: Document still pending
+    removedDocIds.add("tx-still-pending");
+    const freshPendingSnap = await mockGetDocPending();
+    if (freshPendingSnap.exists()) {
+      const freshTx = freshPendingSnap.data();
+      // If freshTx status is still pending, it is ignored for status completion
+      const statusUpper = (freshTx.status || "").toUpperCase();
+      if (statusUpper !== "PENDING" && statusUpper !== "PROCESSING") {
+        removedTxMap.set(freshTx.id, freshTx);
+      }
+    }
+
+    const updatedList = history.map((tx) => {
+      const statusUpper = (tx.status || "").toUpperCase();
+      const isTxPending = statusUpper === "PENDING" || statusUpper === "PROCESSING";
+
+      if (isTxPending && (removedDocIds.has(tx.id) || (tx.reference && removedDocIds.has(tx.reference)))) {
+        const transitionMatch = removedTxMap.get(tx.id) || (tx.reference ? removedTxMap.get(tx.reference) : undefined);
+        if (transitionMatch) {
+          return {
+            ...tx,
+            ...transitionMatch,
+          };
+        }
+      }
+      return tx;
+    });
+
+    // Neither transaction should be changed to SUCCESS/FAILED
+    expect(updatedList[0].status).toBe("PENDING");
+    expect(updatedList[1].status).toBe("PENDING");
+    expect(updatedList.length).toBe(2);
+  });
+
   it("5. Monthly wallet credit total recalculates correctly when a pending deposit transitions to SUCCESS", () => {
     const now = new Date();
     const startOfMonthIso = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
