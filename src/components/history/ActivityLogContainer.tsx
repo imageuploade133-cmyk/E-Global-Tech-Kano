@@ -10,6 +10,7 @@ import { TransactionIcon } from "@/components/wallet/TransactionIcon";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, onSnapshot, getDoc, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { parseTransactionDoc, processPendingDocChanges, applyPendingTransactionsUpdate } from "@/lib/transaction-history-utils";
 import { toast } from "sonner";
 import { getTransactionLedgerStatus, isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
 import { StatementModal } from "@/components/history/StatementModal";
@@ -29,6 +30,9 @@ export const ActivityLogContainer: React.FC = () => {
 
   // Pagination states for low read operations
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const transactionsRef = useRef<Transaction[]>([]);
+  transactionsRef.current = transactions;
+
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastVisibleDoc, setLastVisibleDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
@@ -151,29 +155,6 @@ export const ActivityLogContainer: React.FC = () => {
     }
   };
 
-  const parseTransactionDoc = (docSnap: QueryDocumentSnapshot<DocumentData> | DocumentData): Transaction => {
-    const data = typeof docSnap.data === "function" ? docSnap.data() : docSnap;
-    const id = docSnap.id || data.id || data.reference;
-    return {
-      ...data,
-      id,
-      reference: data.reference || id,
-      type: data.type || "DEPOSIT",
-      amount: Number(data.amount) || 0,
-      currency: data.currency || "NGN",
-      description: data.description || "",
-      recipientName: data.recipientName || "",
-      bankName: data.bankName || "",
-      status: data.status || "PENDING",
-      date: data.date || "",
-      time: data.time || "",
-      fee: Number(data.fee) || 0,
-      vat: Number(data.vat) || 0,
-      markup: Number(data.markup) || 0,
-      totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
-      totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
-    };
-  };
 
   useEffect(() => {
     fetchInitialTransactions();
@@ -296,121 +277,59 @@ export const ActivityLogContainer: React.FC = () => {
         unsubscribePending = onSnapshot(
           qPending,
           async (pendingSnap) => {
-            const updatedPendingMap = new Map<string, Transaction>();
+            const pendingDocsList: DocumentData[] = [];
+            pendingSnap.forEach((docSnap) => pendingDocsList.push(docSnap));
 
-            pendingSnap.forEach((docSnap) => {
-              const tx = parseTransactionDoc(docSnap);
-              updatedPendingMap.set(tx.id, tx);
-              if (tx.reference) updatedPendingMap.set(tx.reference, tx);
-            });
+            const docChangesList = pendingSnap.docChanges().map((c) => ({
+              type: c.type,
+              doc: c.doc,
+            }));
 
-            const removedDocIds = new Set<string>();
-            const removedTxMap = new Map<string, Transaction>();
+            const { updatedPendingMap, removedDocIds, removedTxMap } =
+              await processPendingDocChanges(pendingDocsList, docChangesList, (ref) => getDoc(ref));
 
-            for (const change of pendingSnap.docChanges()) {
-              if (change.type === "removed") {
-                const removedTx = parseTransactionDoc(change.doc);
-                removedDocIds.add(removedTx.id);
-                if (removedTx.reference) removedDocIds.add(removedTx.reference);
+            const currentTransactions = transactionsRef.current;
+            const { hasChange, updatedList } = applyPendingTransactionsUpdate(
+              currentTransactions,
+              updatedPendingMap,
+              removedDocIds,
+              removedTxMap
+            );
 
-                const statusUpper = (removedTx.status || "").toUpperCase();
-                const isStillPending = statusUpper === "PENDING" || statusUpper === "PROCESSING";
+            if (hasChange) {
+              setTransactions(updatedList);
+              fetchMonthlyTotal();
 
-                if (!isStillPending) {
-                  removedTxMap.set(removedTx.id, removedTx);
-                  if (removedTx.reference) removedTxMap.set(removedTx.reference, removedTx);
-                } else {
-                  try {
-                    const freshSnap = await getDoc(change.doc.ref);
-                    if (freshSnap.exists()) {
-                      const freshTx = parseTransactionDoc(freshSnap);
-                      removedTxMap.set(freshTx.id, freshTx);
-                      if (freshTx.reference) removedTxMap.set(freshTx.reference, freshTx);
-                    }
-                  } catch (e) {
-                    console.warn("[Pending Listener removed getDoc Warning]:", e);
-                  }
+              setSelectedTx((currentSelected) => {
+                if (!currentSelected) return null;
+                const matchInUpdated = updatedList.find(
+                  (t) => t.id === currentSelected.id || t.reference === currentSelected.reference
+                );
+                if (
+                  matchInUpdated &&
+                  (matchInUpdated.status !== currentSelected.status ||
+                    matchInUpdated.totalCredited !== currentSelected.totalCredited)
+                ) {
+                  return matchInUpdated;
+                }
+                return currentSelected;
+              });
+
+              if (typeof window !== "undefined") {
+                try {
+                  sessionStorage.setItem(
+                    `history_transactions_cache_${user.uid}`,
+                    JSON.stringify({
+                      data: updatedList.slice(0, 15),
+                      hasMore: hasMore,
+                      timestamp: Date.now(),
+                    })
+                  );
+                } catch {
+                  // Ignore cache error
                 }
               }
             }
-
-            setTransactions((prev) => {
-              if (prev.length === 0) return prev;
-              let hasChange = false;
-
-              const updatedList = prev.map((tx) => {
-                const statusUpper = (tx.status || "").toUpperCase();
-                const isTxPending = statusUpper === "PENDING" || statusUpper === "PROCESSING";
-
-                if (isTxPending && (removedDocIds.has(tx.id) || (tx.reference && removedDocIds.has(tx.reference)))) {
-                  const transitionMatch = removedTxMap.get(tx.id) || (tx.reference ? removedTxMap.get(tx.reference) : undefined);
-                  if (transitionMatch) {
-                    hasChange = true;
-                    return {
-                      ...tx,
-                      ...transitionMatch,
-                    };
-                  }
-                }
-
-                if (isTxPending) {
-                  const match = updatedPendingMap.get(tx.id) || (tx.reference ? updatedPendingMap.get(tx.reference) : undefined);
-                  if (
-                    match &&
-                    (match.status !== tx.status ||
-                      match.totalCredited !== tx.totalCredited ||
-                      match.totalDebited !== tx.totalDebited ||
-                      match.amount !== tx.amount)
-                  ) {
-                    hasChange = true;
-                    return {
-                      ...tx,
-                      ...match,
-                    };
-                  }
-                }
-
-                return tx;
-              });
-
-              if (hasChange) {
-                fetchMonthlyTotal();
-
-                setSelectedTx((currentSelected) => {
-                  if (!currentSelected) return null;
-                  const matchInUpdated = updatedList.find(
-                    (t) => t.id === currentSelected.id || t.reference === currentSelected.reference
-                  );
-                  if (
-                    matchInUpdated &&
-                    (matchInUpdated.status !== currentSelected.status ||
-                      matchInUpdated.totalCredited !== currentSelected.totalCredited)
-                  ) {
-                    return matchInUpdated;
-                  }
-                  return currentSelected;
-                });
-
-                if (typeof window !== "undefined") {
-                  try {
-                    sessionStorage.setItem(
-                      `history_transactions_cache_${user.uid}`,
-                      JSON.stringify({
-                        data: updatedList.slice(0, 15),
-                        hasMore: hasMore,
-                        timestamp: Date.now(),
-                      })
-                    );
-                  } catch {
-                    // Ignore cache error
-                  }
-                }
-
-                return updatedList;
-              }
-
-              return prev;
-            });
           },
           (pError) => {
             console.warn("[ActivityLogContainer Pending Listener Warning]:", pError?.message || pError);
