@@ -80,7 +80,64 @@ describe("Transaction History Real-Time Status Updates & Cache Consistency", () 
     expect(mergedList.find((t) => t.id === "tx-1")?.status).toBe("SUCCESS");
   });
 
-  it("4. Session cache serialization format preserves updated transactions", () => {
+  it("4. Target pending listener updates older pagination page items (index > 15) in-place without row duplication", () => {
+    // Generate 20 history items (older items loaded via handleLoadMore on page 2)
+    const page1And2History = Array.from({ length: 20 }, (_, i) => ({
+      id: `tx-page-${i + 1}`,
+      reference: `ref-page-${i + 1}`,
+      status: i === 18 ? "PENDING" : "SUCCESS", // tx-page-19 is pending on page 2
+      createdAt: new Date(Date.now() - (i + 1) * 3600000).toISOString(),
+    }));
+
+    // Target pending listener receives snapshot with updated status for tx-page-19
+    const pendingSnapshotUpdate = [
+      {
+        id: "tx-page-19",
+        reference: "ref-page-19",
+        status: "SUCCESS",
+        totalCredited: 20000,
+        createdAt: new Date(Date.now() - 19 * 3600000).toISOString(),
+      },
+    ];
+
+    const updatedHistory = page1And2History.map((tx) => {
+      const match = pendingSnapshotUpdate.find((p) => p.id === tx.id);
+      return match ? match : tx;
+    });
+
+    expect(updatedHistory.length).toBe(20);
+    expect(updatedHistory[18].id).toBe("tx-page-19");
+    expect(updatedHistory[18].status).toBe("SUCCESS");
+  });
+
+  it("5. Monthly wallet credit total recalculates correctly when a pending deposit transitions to SUCCESS", () => {
+    const now = new Date();
+    const startOfMonthIso = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const transactions = [
+      { id: "tx-1", type: "WALLET_FUNDING", amount: 10000, status: "SUCCESS", createdAt: startOfMonthIso },
+      { id: "tx-2", type: "WALLET_FUNDING", amount: 5000, status: "PENDING", createdAt: startOfMonthIso },
+    ];
+
+    const calculateMonthlyTotal = (txList: typeof transactions) => {
+      let sum = 0;
+      txList.forEach((tx) => {
+        const isSuccess = (tx.status || "").toUpperCase() === "SUCCESS";
+        if (isSuccess && isCreditTransaction(tx)) {
+          sum += getTransactionDisplayAmount(tx);
+        }
+      });
+      return sum;
+    };
+
+    expect(calculateMonthlyTotal(transactions)).toBe(10000);
+
+    // Pending deposit transitions to SUCCESS via delayed reconciliation
+    transactions[1].status = "SUCCESS";
+    expect(calculateMonthlyTotal(transactions)).toBe(15000);
+  });
+
+  it("6. Session cache serialization format preserves updated transactions", () => {
     const list = [
       { id: "tx-3", reference: "ref-3", status: "SUCCESS", amount: 50000, totalCredited: 50000 },
     ];

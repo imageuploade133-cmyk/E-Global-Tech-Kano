@@ -210,21 +210,23 @@ export const ActivityLogContainer: React.FC = () => {
 
     fetchMonthlyTotal();
 
-    // Attach real-time listener for the initial batch to instantly capture delayed reconciliation updates
-    let unsubscribe: (() => void) | null = null;
+    // Attach real-time listeners for initial batch AND active pending transactions across all pagination pages
+    let unsubscribeMain: (() => void) | null = null;
+    let unsubscribePending: (() => void) | null = null;
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
 
     if (!isMock && user) {
       try {
-        const q = query(
+        const qMain = query(
           collection(db, "transactions"),
           where("userId", "==", user.uid),
           orderBy("createdAt", "desc"),
           limit(15)
         );
 
-        unsubscribe = onSnapshot(
-          q,
+        // 1. Primary listener for top 15 recent transactions
+        unsubscribeMain = onSnapshot(
+          qMain,
           (snap) => {
             const snapshotList: Transaction[] = [];
             snap.forEach((docSnap) => {
@@ -234,12 +236,10 @@ export const ActivityLogContainer: React.FC = () => {
             setTransactions((prev) => {
               const txMap = new Map<string, Transaction>();
 
-              // Load new snapshot docs first
               snapshotList.forEach((tx) => {
                 txMap.set(tx.id, tx);
               });
 
-              // Keep any pagination pages loaded earlier if not present in current snapshot
               prev.forEach((tx) => {
                 if (!txMap.has(tx.id)) {
                   txMap.set(tx.id, tx);
@@ -252,7 +252,6 @@ export const ActivityLogContainer: React.FC = () => {
                 return tB - tA;
               });
 
-              // Keep sessionStorage cache synchronized with updated records
               if (typeof window !== "undefined") {
                 try {
                   sessionStorage.setItem(
@@ -267,7 +266,6 @@ export const ActivityLogContainer: React.FC = () => {
               return merged;
             });
 
-            // If a receipt drawer is open, keep its details updated dynamically
             setSelectedTx((currentSelected) => {
               if (!currentSelected) return null;
               const updated = snapshotList.find((t) => t.id === currentSelected.id || t.reference === currentSelected.reference);
@@ -284,11 +282,54 @@ export const ActivityLogContainer: React.FC = () => {
             setLoading(false);
           },
           (error) => {
-            console.warn("[ActivityLogContainer onSnapshot Warning]:", error?.message || error);
+            console.warn("[ActivityLogContainer onSnapshot Main Warning]:", error?.message || error);
+          }
+        );
+
+        // 2. Targeted listener for all pending transactions belonging to user (monitors older pages seamlessly)
+        const qPending = query(
+          collection(db, "transactions"),
+          where("userId", "==", user.uid),
+          where("status", "in", ["PENDING", "pending", "PROCESSING", "processing"])
+        );
+
+        unsubscribePending = onSnapshot(
+          qPending,
+          (pendingSnap) => {
+            const pendingList: Transaction[] = [];
+            pendingSnap.forEach((docSnap) => {
+              pendingList.push(parseTransactionDoc(docSnap));
+            });
+
+            setTransactions((prev) => {
+              if (prev.length === 0) return prev;
+              let hasChange = false;
+              const updated = prev.map((tx) => {
+                const isStatusPending = (tx.status || "").toUpperCase() === "PENDING" || (tx.status || "").toUpperCase() === "PROCESSING";
+                if (isStatusPending) {
+                  const match = pendingList.find((p) => p.id === tx.id || p.reference === tx.reference);
+                  // If matching doc was updated or no longer pending in Firestore, update it
+                  if (match && (match.status !== tx.status || match.totalCredited !== tx.totalCredited)) {
+                    hasChange = true;
+                    return match;
+                  }
+                }
+                return tx;
+              });
+
+              if (hasChange) {
+                fetchMonthlyTotal();
+                return updated;
+              }
+              return prev;
+            });
+          },
+          (pError) => {
+            console.warn("[ActivityLogContainer Pending Listener Warning]:", pError?.message || pError);
           }
         );
       } catch (err: any) {
-        console.warn("[ActivityLogContainer Setup Listener Exception]:", err?.message || err);
+        console.warn("[ActivityLogContainer Setup Listeners Exception]:", err?.message || err);
       }
     }
 
@@ -300,9 +341,8 @@ export const ActivityLogContainer: React.FC = () => {
     window.addEventListener("app-refresh", handleAppRefresh);
     return () => {
       window.removeEventListener("app-refresh", handleAppRefresh);
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      if (unsubscribeMain) unsubscribeMain();
+      if (unsubscribePending) unsubscribePending();
     };
   }, [user]);
 
