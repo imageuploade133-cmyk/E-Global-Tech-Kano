@@ -85,29 +85,123 @@ describe("Transaction History Real-Time Status Updates & Cache Consistency", () 
     const page1And2History = Array.from({ length: 20 }, (_, i) => ({
       id: `tx-page-${i + 1}`,
       reference: `ref-page-${i + 1}`,
+      type: "DEPOSIT",
+      amount: 20000,
+      currency: "NGN",
       status: i === 18 ? "PENDING" : "SUCCESS", // tx-page-19 is pending on page 2
       createdAt: new Date(Date.now() - (i + 1) * 3600000).toISOString(),
     }));
 
-    // Target pending listener receives snapshot with updated status for tx-page-19
-    const pendingSnapshotUpdate = [
+    // When tx-page-19 transitions from PENDING -> SUCCESS in Firestore, it exits qPending query.
+    // Simulating pendingSnap.docChanges() type === "removed" payload
+    const removedDocChanges = [
       {
-        id: "tx-page-19",
-        reference: "ref-page-19",
-        status: "SUCCESS",
-        totalCredited: 20000,
-        createdAt: new Date(Date.now() - 19 * 3600000).toISOString(),
+        type: "removed",
+        doc: {
+          id: "tx-page-19",
+          reference: "ref-page-19",
+          type: "DEPOSIT",
+          amount: 20000,
+          currency: "NGN",
+          status: "SUCCESS",
+          totalCredited: 20000,
+          createdAt: new Date(Date.now() - 19 * 3600000).toISOString(),
+        },
       },
     ];
 
+    const removedDocIds = new Set<string>();
+    const removedTxMap = new Map<string, any>();
+
+    removedDocChanges.forEach((change) => {
+      if (change.type === "removed") {
+        removedDocIds.add(change.doc.id);
+        if (change.doc.reference) removedDocIds.add(change.doc.reference);
+        removedTxMap.set(change.doc.id, change.doc);
+        if (change.doc.reference) removedTxMap.set(change.doc.reference, change.doc);
+      }
+    });
+
     const updatedHistory = page1And2History.map((tx) => {
-      const match = pendingSnapshotUpdate.find((p) => p.id === tx.id);
-      return match ? match : tx;
+      const statusUpper = (tx.status || "").toUpperCase();
+      const isTxPending = statusUpper === "PENDING" || statusUpper === "PROCESSING";
+
+      if (isTxPending && (removedDocIds.has(tx.id) || (tx.reference && removedDocIds.has(tx.reference)))) {
+        const transitionMatch = removedTxMap.get(tx.id) || (tx.reference ? removedTxMap.get(tx.reference) : undefined);
+        if (transitionMatch) {
+          return {
+            ...tx,
+            ...transitionMatch,
+          };
+        }
+      }
+      return tx;
     });
 
     expect(updatedHistory.length).toBe(20);
     expect(updatedHistory[18].id).toBe("tx-page-19");
     expect(updatedHistory[18].status).toBe("SUCCESS");
+    expect(getTransactionLedgerStatus(updatedHistory[18]).code).toBe("CREDITED");
+  });
+
+  it("4b. Target pending listener updates older pagination page items on PENDING -> FAILED transition", () => {
+    const page1And2History = Array.from({ length: 20 }, (_, i) => ({
+      id: `tx-page-${i + 1}`,
+      reference: `ref-page-${i + 1}`,
+      type: "DEPOSIT",
+      amount: 15000,
+      currency: "NGN",
+      status: i === 18 ? "PENDING" : "SUCCESS",
+      createdAt: new Date(Date.now() - (i + 1) * 3600000).toISOString(),
+    }));
+
+    const removedDocChanges = [
+      {
+        type: "removed",
+        doc: {
+          id: "tx-page-19",
+          reference: "ref-page-19",
+          type: "DEPOSIT",
+          amount: 15000,
+          currency: "NGN",
+          status: "FAILED",
+          createdAt: new Date(Date.now() - 19 * 3600000).toISOString(),
+        },
+      },
+    ];
+
+    const removedDocIds = new Set<string>();
+    const removedTxMap = new Map<string, any>();
+
+    removedDocChanges.forEach((change) => {
+      if (change.type === "removed") {
+        removedDocIds.add(change.doc.id);
+        if (change.doc.reference) removedDocIds.add(change.doc.reference);
+        removedTxMap.set(change.doc.id, change.doc);
+        if (change.doc.reference) removedTxMap.set(change.doc.reference, change.doc);
+      }
+    });
+
+    const updatedHistory = page1And2History.map((tx) => {
+      const statusUpper = (tx.status || "").toUpperCase();
+      const isTxPending = statusUpper === "PENDING" || statusUpper === "PROCESSING";
+
+      if (isTxPending && (removedDocIds.has(tx.id) || (tx.reference && removedDocIds.has(tx.reference)))) {
+        const transitionMatch = removedTxMap.get(tx.id) || (tx.reference ? removedTxMap.get(tx.reference) : undefined);
+        if (transitionMatch) {
+          return {
+            ...tx,
+            ...transitionMatch,
+          };
+        }
+      }
+      return tx;
+    });
+
+    expect(updatedHistory.length).toBe(20);
+    expect(updatedHistory[18].id).toBe("tx-page-19");
+    expect(updatedHistory[18].status).toBe("FAILED");
+    expect(getTransactionLedgerStatus(updatedHistory[18]).code).toBe("FAILED");
   });
 
   it("5. Monthly wallet credit total recalculates correctly when a pending deposit transitions to SUCCESS", () => {

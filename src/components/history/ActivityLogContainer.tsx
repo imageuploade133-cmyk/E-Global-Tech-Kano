@@ -9,7 +9,7 @@ import { TransactionReceipt, Transaction } from "@/components/wallet/Transaction
 import { TransactionIcon } from "@/components/wallet/TransactionIcon";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { db } from "@/lib/firebase";
-import { collection, query, where, orderBy, limit, getDocs, startAfter, onSnapshot, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, getDocs, startAfter, onSnapshot, getDoc, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { toast } from "sonner";
 import { getTransactionLedgerStatus, isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
 import { StatementModal } from "@/components/history/StatementModal";
@@ -295,32 +295,120 @@ export const ActivityLogContainer: React.FC = () => {
 
         unsubscribePending = onSnapshot(
           qPending,
-          (pendingSnap) => {
-            const pendingList: Transaction[] = [];
+          async (pendingSnap) => {
+            const updatedPendingMap = new Map<string, Transaction>();
+
             pendingSnap.forEach((docSnap) => {
-              pendingList.push(parseTransactionDoc(docSnap));
+              const tx = parseTransactionDoc(docSnap);
+              updatedPendingMap.set(tx.id, tx);
+              if (tx.reference) updatedPendingMap.set(tx.reference, tx);
             });
+
+            const removedDocIds = new Set<string>();
+            const removedTxMap = new Map<string, Transaction>();
+
+            for (const change of pendingSnap.docChanges()) {
+              if (change.type === "removed") {
+                const removedTx = parseTransactionDoc(change.doc);
+                removedDocIds.add(removedTx.id);
+                if (removedTx.reference) removedDocIds.add(removedTx.reference);
+
+                const statusUpper = (removedTx.status || "").toUpperCase();
+                const isStillPending = statusUpper === "PENDING" || statusUpper === "PROCESSING";
+
+                if (!isStillPending) {
+                  removedTxMap.set(removedTx.id, removedTx);
+                  if (removedTx.reference) removedTxMap.set(removedTx.reference, removedTx);
+                } else {
+                  try {
+                    const freshSnap = await getDoc(change.doc.ref);
+                    if (freshSnap.exists()) {
+                      const freshTx = parseTransactionDoc(freshSnap);
+                      removedTxMap.set(freshTx.id, freshTx);
+                      if (freshTx.reference) removedTxMap.set(freshTx.reference, freshTx);
+                    }
+                  } catch (e) {
+                    console.warn("[Pending Listener removed getDoc Warning]:", e);
+                  }
+                }
+              }
+            }
 
             setTransactions((prev) => {
               if (prev.length === 0) return prev;
               let hasChange = false;
-              const updated = prev.map((tx) => {
-                const isStatusPending = (tx.status || "").toUpperCase() === "PENDING" || (tx.status || "").toUpperCase() === "PROCESSING";
-                if (isStatusPending) {
-                  const match = pendingList.find((p) => p.id === tx.id || p.reference === tx.reference);
-                  // If matching doc was updated or no longer pending in Firestore, update it
-                  if (match && (match.status !== tx.status || match.totalCredited !== tx.totalCredited)) {
+
+              const updatedList = prev.map((tx) => {
+                const statusUpper = (tx.status || "").toUpperCase();
+                const isTxPending = statusUpper === "PENDING" || statusUpper === "PROCESSING";
+
+                if (isTxPending && (removedDocIds.has(tx.id) || (tx.reference && removedDocIds.has(tx.reference)))) {
+                  const transitionMatch = removedTxMap.get(tx.id) || (tx.reference ? removedTxMap.get(tx.reference) : undefined);
+                  if (transitionMatch) {
                     hasChange = true;
-                    return match;
+                    return {
+                      ...tx,
+                      ...transitionMatch,
+                    };
                   }
                 }
+
+                if (isTxPending) {
+                  const match = updatedPendingMap.get(tx.id) || (tx.reference ? updatedPendingMap.get(tx.reference) : undefined);
+                  if (
+                    match &&
+                    (match.status !== tx.status ||
+                      match.totalCredited !== tx.totalCredited ||
+                      match.totalDebited !== tx.totalDebited ||
+                      match.amount !== tx.amount)
+                  ) {
+                    hasChange = true;
+                    return {
+                      ...tx,
+                      ...match,
+                    };
+                  }
+                }
+
                 return tx;
               });
 
               if (hasChange) {
                 fetchMonthlyTotal();
-                return updated;
+
+                setSelectedTx((currentSelected) => {
+                  if (!currentSelected) return null;
+                  const matchInUpdated = updatedList.find(
+                    (t) => t.id === currentSelected.id || t.reference === currentSelected.reference
+                  );
+                  if (
+                    matchInUpdated &&
+                    (matchInUpdated.status !== currentSelected.status ||
+                      matchInUpdated.totalCredited !== currentSelected.totalCredited)
+                  ) {
+                    return matchInUpdated;
+                  }
+                  return currentSelected;
+                });
+
+                if (typeof window !== "undefined") {
+                  try {
+                    sessionStorage.setItem(
+                      `history_transactions_cache_${user.uid}`,
+                      JSON.stringify({
+                        data: updatedList.slice(0, 15),
+                        hasMore: hasMore,
+                        timestamp: Date.now(),
+                      })
+                    );
+                  } catch {
+                    // Ignore cache error
+                  }
+                }
+
+                return updatedList;
               }
+
               return prev;
             });
           },
