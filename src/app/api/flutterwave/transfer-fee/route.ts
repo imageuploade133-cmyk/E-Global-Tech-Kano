@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { authenticateUserRequest, verifyUserKycApproved } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { calculateTransferMarkupFee, TransferTieredMarkup } from "@/lib/transfer-markup-util";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 export async function GET(req: Request) {
   const reqId = `fee-req-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
-  const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+  const gatewayUrl = getGatewayUrl();
 
   let uid = "";
   // 1. Authenticate user to ensure secure access (no hackers/scammers)
@@ -167,7 +168,13 @@ export async function GET(req: Request) {
               "Content-Type": "application/json",
             },
           });
-          const feeData = await feeRes.json();
+          const feeText = await feeRes.text().catch(() => "");
+          let feeData: Record<string, any> = {};
+          try {
+            feeData = feeText ? JSON.parse(feeText) : {};
+          } catch {
+            feeData = {};
+          }
           if (feeRes.ok && feeData.success) {
             baseFee = Number(feeData.fee) || 10.00;
           }

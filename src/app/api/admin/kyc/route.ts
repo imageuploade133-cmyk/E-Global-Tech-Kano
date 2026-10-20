@@ -3,8 +3,9 @@ import { mintFirebaseIdToken } from "@/lib/admin-auth";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+const GATEWAY_URL = getGatewayUrl();
 
 async function autoReleaseUserHeldDeposits(userId: string, adminEmail: string) {
   try {

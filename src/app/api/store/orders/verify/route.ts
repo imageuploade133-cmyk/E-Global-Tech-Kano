@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 export async function GET(req: Request) {
   try {
@@ -26,7 +27,7 @@ export async function GET(req: Request) {
       return NextResponse.redirect(new URL(`/store?orderSuccess=${orderId}`, req.url));
     }
 
-    const gatewayUrl = (process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org").replace(/\/$/, "");
+    const gatewayUrl = getGatewayUrl();
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
     const txRef = url.searchParams.get("tx_ref") || orderData?.txRef || `TX-STORE-${orderId}`;
 
