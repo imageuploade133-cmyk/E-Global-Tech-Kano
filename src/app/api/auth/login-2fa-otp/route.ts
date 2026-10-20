@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { adminDb } from "@/lib/firebase-admin";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { sendEmail } from "@/lib/email-service";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 function maskEmail(email: string): string {
   if (!email || !email.includes("@")) return "u***r@gmail.com";
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
 
       if (channel === "whatsapp") {
         // WhatsApp dispatch via gateway URL
-        const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+        const gatewayUrl = getGatewayUrl();
         const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "";
 
         try {
