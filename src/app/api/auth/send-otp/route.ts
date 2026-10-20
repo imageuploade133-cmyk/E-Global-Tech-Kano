@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import crypto from "crypto";
 import { sendEmail } from "@/lib/email-service";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+const GATEWAY_URL = getGatewayUrl();
 
 export async function POST(req: Request) {
   try {
@@ -142,6 +143,11 @@ export async function POST(req: Request) {
       result = JSON.parse(responseText);
     } catch {
       console.error("[WhatsApp OTP Send Proxy] Received non-JSON response from gateway:", responseText);
+      if (responseText.includes("Cannot POST") || responseText.includes("<!DOCTYPE") || response.status === 404) {
+        return NextResponse.json({
+          error: "WhatsApp OTP service is currently unavailable. Please use Email verification instead."
+        }, { status: 502 });
+      }
       return NextResponse.json({
         error: `Database Gateway unreachable or returned an invalid response (HTTP ${response.status}).`
       }, { status: 502 });
@@ -153,9 +159,11 @@ export async function POST(req: Request) {
         rawErr.includes("WhatsApp instance") ||
         rawErr.includes("not active or connected") ||
         rawErr.includes("WhatsApp Dispatch Failed") ||
-        rawErr.includes("WHATSAPP_API")
+        rawErr.includes("WHATSAPP_API") ||
+        rawErr.includes("Cannot POST") ||
+        rawErr.includes("<!DOCTYPE")
       ) {
-        rawErr = "WhatsApp OTP is not available at this time.";
+        rawErr = "WhatsApp OTP is not available at this time. Please use Email verification instead.";
       }
       return NextResponse.json({ error: rawErr }, { status: response.status });
     }

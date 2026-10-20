@@ -3,8 +3,9 @@ import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+const GATEWAY_URL = getGatewayUrl();
 const GATEWAY_API_KEY = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
 
 function maskPhone(phone: string): string {

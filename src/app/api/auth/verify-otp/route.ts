@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import crypto from "crypto";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+const GATEWAY_URL = getGatewayUrl();
 
 export async function POST(req: Request) {
   try {
@@ -111,13 +112,22 @@ export async function POST(req: Request) {
       result = JSON.parse(responseText);
     } catch {
       console.error("[WhatsApp OTP Verify Proxy] Received non-JSON response from gateway:", responseText);
+      if (responseText.includes("Cannot POST") || responseText.includes("<!DOCTYPE") || response.status === 404) {
+        return NextResponse.json({
+          error: "WhatsApp OTP verification service is currently unavailable."
+        }, { status: 502 });
+      }
       return NextResponse.json({
         error: `Database Gateway unreachable or returned an invalid response (HTTP ${response.status}).`
       }, { status: 502 });
     }
 
     if (!response.ok) {
-      return NextResponse.json({ error: result.message || "Failed to verify WhatsApp OTP." }, { status: response.status });
+      let rawErr = String(result.message || result.error || "Failed to verify WhatsApp OTP.");
+      if (rawErr.includes("Cannot POST") || rawErr.includes("<!DOCTYPE")) {
+        rawErr = "WhatsApp OTP verification service is currently unavailable.";
+      }
+      return NextResponse.json({ error: rawErr }, { status: response.status });
     }
 
     return NextResponse.json({

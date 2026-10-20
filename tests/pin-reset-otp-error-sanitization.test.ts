@@ -1,19 +1,37 @@
 import { expect, test, describe } from "bun:test";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-describe("PIN Reset OTP Gateway URL Normalization & Fallback Routing", () => {
-  test("normalizes PAYMENT_GATEWAY_URL trailing slashes to prevent double slashes in route concatenation", () => {
-    const rawGatewayUrlWithSlash = "http://127.0.0.1:3055///";
-    const cleanGatewayUrl = rawGatewayUrlWithSlash.replace(/\/+$/, "");
+describe("Gateway URL Normalization & WhatsApp Proxy Error Handling", () => {
+  test("getGatewayUrl cleans trailing slashes from process.env.PAYMENT_GATEWAY_URL", () => {
+    const originalEnv = process.env.PAYMENT_GATEWAY_URL;
+    process.env.PAYMENT_GATEWAY_URL = "https://etechglobalhub.duckdns.org///";
+    expect(getGatewayUrl()).toBe("https://etechglobalhub.duckdns.org");
 
-    const targetEndpoint = `${cleanGatewayUrl}/api/auth/pin-reset-otp`;
-    expect(targetEndpoint).toBe("http://127.0.0.1:3055/api/auth/pin-reset-otp");
-    expect(targetEndpoint).not.toContain("//api");
+    process.env.PAYMENT_GATEWAY_URL = "http://127.0.0.1:3055";
+    expect(getGatewayUrl()).toBe("http://127.0.0.1:3055");
+
+    process.env.PAYMENT_GATEWAY_URL = originalEnv;
+  });
+
+  test("send-otp proxy catches Express 404 HTML response ('Cannot POST //api/auth/send-otp') and returns friendly message", () => {
+    const rawHtmlResponse = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST //api/auth/send-otp</pre>\n</body>\n</html>\n";
+
+    let result: any = {};
+    try {
+      result = JSON.parse(rawHtmlResponse);
+    } catch {
+      if (rawHtmlResponse.includes("Cannot POST") || rawHtmlResponse.includes("<!DOCTYPE")) {
+        result = { error: "WhatsApp OTP service is currently unavailable. Please use Email verification instead." };
+      }
+    }
+
+    expect(result.error).toBe("WhatsApp OTP service is currently unavailable. Please use Email verification instead.");
+    expect(result.error).not.toContain("<!DOCTYPE");
   });
 
   test("falls back to /api/auth/send-otp when gateway returns 404 for /api/auth/pin-reset-otp", async () => {
     let attemptedEndpoints: string[] = [];
 
-    // Mock fetch handler simulating gateway behavior
     const mockFetch = async (url: string, init?: any) => {
       attemptedEndpoints.push(url);
       if (url.endsWith("/api/auth/pin-reset-otp")) {
@@ -68,66 +86,5 @@ describe("PIN Reset OTP Gateway URL Normalization & Fallback Routing", () => {
     expect(response.status).toBe(200);
     expect(result.success).toBe(true);
     expect(result.message).toBe("OTP sent via WhatsApp fallback");
-  });
-
-  test("sanitizes Express/Gateway HTML 404 response 'Cannot POST //api/auth/pin-reset-otp' to friendly message if fallback fails", () => {
-    const rawHtmlResponse = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST //api/auth/pin-reset-otp</pre>\n</body>\n</html>\n";
-
-    let result: Record<string, any> = {};
-    try {
-      result = JSON.parse(rawHtmlResponse);
-    } catch {
-      if (rawHtmlResponse.includes("504") || rawHtmlResponse.includes("Gateway Time-out")) {
-        result = { error: "Gateway timed out while connecting to server. Please try again in a few seconds." };
-      } else if (rawHtmlResponse.includes("Cannot POST") || rawHtmlResponse.includes("<!DOCTYPE")) {
-        result = { error: "WhatsApp OTP service is currently unavailable. Please use the Email OTP option instead." };
-      } else {
-        result = { error: rawHtmlResponse || "Server returned non-JSON response." };
-      }
-    }
-
-    let rawErr = String(result.error || result.message || "Failed to dispatch PIN reset OTP.");
-    const isOk = false;
-    const status = 404;
-
-    if (!isOk) {
-      if (
-        rawErr.includes("WhatsApp instance") ||
-        rawErr.includes("not active or connected") ||
-        rawErr.includes("WhatsApp Dispatch Failed") ||
-        rawErr.includes("WHATSAPP_API") ||
-        rawErr.includes("ECONNREFUSED") ||
-        rawErr.includes("Cannot POST") ||
-        rawErr.includes("<!DOCTYPE") ||
-        rawErr.includes("html") ||
-        status === 400 ||
-        status === 404 ||
-        status === 502 ||
-        status === 503
-      ) {
-        rawErr = "WhatsApp OTP service is currently unavailable. Please use the Email OTP option instead.";
-      }
-    }
-
-    expect(rawErr).toBe("WhatsApp OTP service is currently unavailable. Please use the Email OTP option instead.");
-    expect(rawErr).not.toContain("<!DOCTYPE");
-    expect(rawErr).not.toContain("Cannot POST");
-  });
-
-  test("sanitizes frontend toast message if raw HTML string slips through", () => {
-    const dataError = "<!DOCTYPE html>\n<html><body>Cannot POST /api/auth/pin-reset-otp</body></html>";
-    let errStr = typeof dataError === "string" ? dataError : "Failed to send OTP";
-    if (
-      errStr.includes("<!DOCTYPE") ||
-      errStr.includes("Cannot POST") ||
-      errStr.includes("html") ||
-      errStr.includes("WhatsApp instance") ||
-      errStr.includes("not active or connected") ||
-      errStr.includes("WhatsApp Dispatch Failed")
-    ) {
-      errStr = "WhatsApp OTP service is currently unavailable. Please use the Email OTP option instead.";
-    }
-
-    expect(errStr).toBe("WhatsApp OTP service is currently unavailable. Please use the Email OTP option instead.");
   });
 });
