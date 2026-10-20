@@ -7,6 +7,7 @@ import { PaymentGatewayManager } from "@/lib/payment/PaymentGatewayManager";
 import { NotificationService } from "@/services/notification-service";
 import bcrypt from "bcryptjs";
 import { MOCK_ITEMS } from "../items/config";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 function sanitizeBillErrorMessage(rawMessage: string, billType: string = "bill"): string {
   const msg = String(rawMessage || "").toLowerCase();
@@ -118,7 +119,7 @@ export async function POST(req: Request) {
         const apiCategory = biller_type?.toUpperCase() === "DATA" ? "MOBILEDATA" : biller_type?.toUpperCase() || "AIRTIME";
 
         // Validate Biller Provider Exists
-        const billersResponse = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/proxy", {
+        const billersResponse = await fetch(`${getGatewayUrl()}/api/flutterwave/proxy`, {
           method: "POST",
           headers: {
             "Authorization": authHeader,
@@ -144,7 +145,7 @@ export async function POST(req: Request) {
         }
 
         // Validate Biller Package Item Exists
-        const itemsResponse = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/proxy", {
+        const itemsResponse = await fetch(`${getGatewayUrl()}/api/flutterwave/proxy`, {
           method: "POST",
           headers: {
             "Authorization": authHeader,

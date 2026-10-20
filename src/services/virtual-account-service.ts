@@ -1,8 +1,9 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { UserWalletAccount, FLWVirtualAccountResponse } from "@/types/flutterwave";
 import { safeParseJson } from "@/lib/utils";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const FLW_BASE_URL = "https://etechglobalhub.duckdns.org/api/flutterwave";
+const getFlwBaseUrl = () => `${getGatewayUrl()}/api/flutterwave`;
 
 export class VirtualAccountService {
   /**
@@ -73,7 +74,7 @@ export class VirtualAccountService {
 
     const customNarration = `${firstname} ${lastname}`.trim().slice(0, 35);
 
-    const response = await fetch(`${FLW_BASE_URL}/create-virtual-account`, {
+    const response = await fetch(`${getFlwBaseUrl()}/create-virtual-account`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${idToken || ""}`,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { MOCK_ITEMS } from "./config";
 import { safeParseJson } from "@/lib/utils";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 export async function GET(req: Request) {
   try {
@@ -11,7 +12,7 @@ export async function GET(req: Request) {
     const fallback = MOCK_ITEMS[biller_code] || [{ name: "Custom Package", item_code: "ITEM_CUSTOM", amount: 0 }];
 
     // Call the payment gateway cached biller items endpoint
-    const response = await fetch(`https://etechglobalhub.duckdns.org/api/flutterwave/billers/${biller_code}/items`, {
+    const response = await fetch(`${getGatewayUrl()}/api/flutterwave/billers/${biller_code}/items`, {
       method: "GET",
       headers: {
         "Authorization": authHeader,

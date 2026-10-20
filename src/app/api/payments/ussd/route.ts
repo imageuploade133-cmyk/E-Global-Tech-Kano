@@ -5,6 +5,7 @@ import { safeParseJson } from "@/lib/utils";
 import { isRateLimited } from "@/lib/rate-limiter";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { resolveUssdCode } from "@/lib/ussd-resolver";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
@@ -154,8 +155,8 @@ export async function POST(req: Request) {
     // Step 5: Log everything - Before forwarding
     console.log("Sending to Payment Gateway", gatewayPayload);
 
-    // Proxy request directly to etechglobalhub.duckdns.org
-    const response = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/charges?type=ussd", {
+    // Proxy request directly to Payment Gateway URL
+    const response = await fetch(`${getGatewayUrl()}/api/flutterwave/charges?type=ussd`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${idToken}`,
