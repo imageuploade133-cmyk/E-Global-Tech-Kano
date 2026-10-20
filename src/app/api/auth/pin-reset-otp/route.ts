@@ -4,7 +4,8 @@ import { adminDb } from "@/lib/firebase-admin";
 import crypto from "crypto";
 import { sendEmail } from "@/lib/email-service";
 
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+const RAW_GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+const GATEWAY_URL = RAW_GATEWAY_URL.replace(/\/+$/, "");
 
 export async function POST(req: Request) {
   try {
@@ -168,14 +169,52 @@ export async function POST(req: Request) {
     };
     if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
 
-    const response = await fetch(`${GATEWAY_URL}/api/auth/pin-reset-otp`, {
+    let response = await fetch(`${GATEWAY_URL}/api/auth/pin-reset-otp`, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
-    }).finally(() => clearTimeout(timeoutId));
+    });
 
-    const responseText = await response.text().catch(() => "");
+    let responseText = await response.text().catch(() => "");
+
+    // Fallback: If gateway doesn't have /api/auth/pin-reset-otp (404), route to /api/auth/send-otp
+    if (response.status === 404 || responseText.includes("Cannot POST")) {
+      let userPhone = (body.phoneNumber || body.phone || "").trim();
+      if (!userPhone && authUser?.uid) {
+        try {
+          const uSnap = await adminDb.collection("users").doc(authUser.uid).get();
+          if (uSnap.exists) {
+            const uData = uSnap.data() || {};
+            userPhone = (uData.phoneNumber || uData.phone || authUser.email || "").trim();
+          }
+        } catch {
+          // Ignore lookup fail
+        }
+      }
+
+      if (userPhone) {
+        const cleanPhone = userPhone.replace(/[^\d+]/g, "");
+        const fallbackRes = await fetch(`${GATEWAY_URL}/api/auth/send-otp`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            phoneNumber: cleanPhone,
+            type: "pin_reset",
+            ...payload
+          }),
+          signal: controller.signal,
+        });
+
+        if (fallbackRes) {
+          response = fallbackRes;
+          responseText = await response.text().catch(() => "");
+        }
+      }
+    }
+
+    clearTimeout(timeoutId);
+
     let result: Record<string, any> = {};
 
     try {
@@ -183,6 +222,8 @@ export async function POST(req: Request) {
     } catch {
       if (responseText.includes("504") || responseText.includes("Gateway Time-out")) {
         result = { error: "Gateway timed out while connecting to server. Please try again in a few seconds." };
+      } else if (responseText.includes("Cannot POST") || responseText.includes("<!DOCTYPE")) {
+        result = { error: "WhatsApp OTP service is currently unavailable. Please use the Email OTP option instead." };
       } else {
         result = { error: responseText || "Server returned non-JSON response." };
       }
@@ -196,10 +237,15 @@ export async function POST(req: Request) {
         rawErr.includes("WhatsApp Dispatch Failed") ||
         rawErr.includes("WHATSAPP_API") ||
         rawErr.includes("ECONNREFUSED") ||
+        rawErr.includes("Cannot POST") ||
+        rawErr.includes("<!DOCTYPE") ||
+        rawErr.includes("html") ||
         response.status === 400 ||
-        response.status === 502
+        response.status === 404 ||
+        response.status === 502 ||
+        response.status === 503
       ) {
-        rawErr = "WhatsApp OTP is not available at this time. Please use Email OTP option instead.";
+        rawErr = "WhatsApp OTP service is currently unavailable. Please use the Email OTP option instead.";
       }
       return NextResponse.json(
         { error: rawErr },
