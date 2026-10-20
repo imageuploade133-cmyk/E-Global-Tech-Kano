@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+const GATEWAY_URL = getGatewayUrl();
 
 export async function POST(req: Request) {
   let uid = "";

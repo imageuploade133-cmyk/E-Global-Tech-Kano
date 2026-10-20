@@ -8,13 +8,14 @@ import { calculateTransferMarkupFee, TransferTieredMarkup } from "@/lib/transfer
 import { getGlobalMinTransferAmount } from "@/lib/global-limits-util";
 import { resolveInternalUserByAccount } from "@/lib/user-resolver";
 import bcrypt from "bcryptjs";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
   let uid = "";
   let requestBody: Record<string, unknown> | null = null;
   let transferProfitMargin = 0;
-  const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+  const gatewayUrl = getGatewayUrl();
 
   console.log("STEP 1 - Request received");
 
@@ -466,7 +467,16 @@ export async function POST(req: Request) {
       });
 
       console.log("STEP 12 - Payment Gateway responded");
-      const gatewayData = await gatewayRes.json();
+      const gatewayText = await gatewayRes.text().catch(() => "");
+      let gatewayData: Record<string, any> = {};
+      try {
+        gatewayData = gatewayText ? JSON.parse(gatewayText) : {};
+      } catch {
+        if (gatewayText.includes("Cannot POST") || gatewayText.includes("<!DOCTYPE") || gatewayRes.status === 404) {
+          throw new Error("Payment Gateway service is temporarily unreachable or returned an invalid response.");
+        }
+        throw new Error(gatewayText || "Payment Gateway returned non-JSON response.");
+      }
 
       if (gatewayRes.ok && gatewayData.success) {
         logPaymentEvent({

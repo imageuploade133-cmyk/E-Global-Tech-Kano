@@ -5,6 +5,8 @@
  */
 
 const rateCache: Map<string, { rate: number; expiresAt: number }> = new Map();
+import { getGatewayUrl } from "@/lib/gateway-util";
+
 const RATE_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 export async function fetchFlutterwaveTransferRate(
@@ -27,7 +29,7 @@ export async function fetchFlutterwaveTransferRate(
     return cached.rate;
   }
 
-  const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+  const gatewayUrl = getGatewayUrl();
   const apiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
   if (!apiKey) {

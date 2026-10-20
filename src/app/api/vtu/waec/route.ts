@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest, verifyUserKycApproved } from "@/lib/auth-util";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 function sanitizeBillErrorMessage(rawMessage: string, defaultType: string = "WAEC PIN"): string {
   const msg = String(rawMessage || "").toLowerCase();
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+    const gatewayUrl = getGatewayUrl();
     const apiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     const headers: Record<string, string> = {
