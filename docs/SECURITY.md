@@ -1,6 +1,6 @@
 # 🔒 Banking-Grade Security Architecture: Firebase Custom Claims
 
-This document details the security architecture of the **E-Global-Tech-Kano** wallet application concerning administrative role management and database isolation.
+This document details the security architecture of the **E-Global-Tech-Kano** wallet application concerning administrative role management and database  isolation.
 
 ---
 
