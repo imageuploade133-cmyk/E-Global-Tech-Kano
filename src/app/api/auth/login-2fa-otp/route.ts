@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { adminDb } from "@/lib/firebase-admin";
 import { authenticateUserRequest } from "@/lib/auth-util";
-import { sendEmail } from "@/lib/email-service";
 import { getGatewayUrl } from "@/lib/gateway-util";
 
 function maskEmail(email: string): string {
@@ -56,69 +55,34 @@ export async function POST(req: Request) {
         channel,
       });
 
-      if (channel === "whatsapp") {
-        // WhatsApp dispatch via gateway URL
-        const gatewayUrl = getGatewayUrl();
-        const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "";
+      const destination = channel === "whatsapp" ? userPhone : userEmail;
+      if (!destination) {
+        await adminDb.collection("login_2fa_otps").doc(uid).delete().catch(() => undefined);
+        return NextResponse.json({
+          error: channel === "whatsapp"
+            ? "No registered phone number found for WhatsApp verification."
+            : "No email address found for user account.",
+        }, { status: 400 });
+      }
 
-        try {
-          const waRes = await fetch(`${gatewayUrl}/api/send/otp`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": gatewayApiKey,
-            },
-            body: JSON.stringify({
-              phone: userPhone,
-              otp: rawOtp,
-              purpose: "2FA Login Authentication",
-            }),
-          });
+      const gatewayUrl = getGatewayUrl().replace(/\\/+$/, "");
+      const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
+      if (!gatewayApiKey) {
+        await adminDb.collection("login_2fa_otps").doc(uid).delete().catch(() => undefined);
+        return NextResponse.json({ error: "OTP gateway authentication is not configured. Please contact support." }, { status: 503 });
+      }
 
-          if (!waRes.ok) {
-            console.warn("[Login 2FA OTP] WhatsApp dispatch failed; falling back to Email.");
-            throw new Error("WhatsApp dispatch unavailable.");
-          }
-        } catch {
-          // If WhatsApp fails, send via Email
-          if (userEmail) {
-            await sendEmail({
-              to: userEmail,
-              subject: "🔐 Your 2FA Login Verification Code",
-              html: `
-                <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #eee; rounded: 16px;">
-                  <h2 style="color: #FC7A00; text-align: center;">E-Global Pay</h2>
-                  <h3 style="text-align: center; color: #111;">2FA Login Security Verification</h3>
-                  <p style="color: #555; font-size: 14px;">Your 6-digit 2FA login verification code is:</p>
-                  <div style="background: #FFF8EC; border: 1px font-mono solid #FFE8CC; border-radius: 12px; padding: 16px; text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #FC7A00; margin: 20px 0;">
-                    ${rawOtp}
-                  </div>
-                  <p style="color: #888; font-size: 12px; text-align: center;">This code expires in 5 minutes. Never share your OTP code with anyone.</p>
-                </div>
-              `,
-            });
-          }
-        }
-      } else {
-        // Send via Email
-        if (!userEmail) {
-          return NextResponse.json({ error: "No email address found for user account." }, { status: 400 });
-        }
-
-        await sendEmail({
-          to: userEmail,
-          subject: "🔐 Your 2FA Login Verification Code",
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 16px;">
-              <h2 style="color: #FC7A00; text-align: center;">E-Global Pay</h2>
-              <h3 style="text-align: center; color: #111;">2FA Login Security Verification</h3>
-              <p style="color: #555; font-size: 14px;">Your 6-digit 2FA login verification code is:</p>
-              <div style="background: #FFF8EC; border: 1px solid #FFE8CC; border-radius: 12px; padding: 16px; text-align: center; font-family: monospace; font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #FC7A00; margin: 20px 0;">
-                ${rawOtp}
-              </div>
-              <p style="color: #888; font-size: 12px; text-align: center;">This code expires in 5 minutes. Never share your OTP code with anyone.</p>
-            </div>
-          `,
+      let dispatchResponse: Response;
+      try {
+        dispatchResponse = await fetch(`${gatewayUrl}/api/auth/dispatch-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": gatewayApiKey },
+          body: JSON.stringify({
+            channel,
+            destination,
+            otp: rawOtp,
+            purpose: "login_2fa",
+          }),
         });
       } catch (dispatchError) {
         await adminDb.collection("login_2fa_otps").doc(uid).delete().catch(() => undefined);
