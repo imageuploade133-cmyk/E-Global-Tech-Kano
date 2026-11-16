@@ -12,11 +12,11 @@ export async function GET(req: Request) {
     const { uid } = perm.auth;
 
     // 1. Fetch dynamic WhatsApp API settings from Firestore config/whatsapp_api
-    let whatsappApiUrl = process.env.WHATSAPP_API_URL || "";
-    let whatsappApiKey = process.env.WHATSAPP_API_KEY || "";
-    let whatsappInstanceId = process.env.WHATSAPP_INSTANCE_ID || "";
-    let whatsappAdminUsername = process.env.WHATSAPP_ADMIN_USERNAME || "";
-    let whatsappAdminPassword = process.env.WHATSAPP_ADMIN_PASSWORD || "";
+    let whatsappApiUrl = "";
+    let whatsappApiKey = "";
+    let whatsappInstanceId = "";
+    let whatsappAdminUsername = "";
+    let whatsappAdminPassword = "";
 
     try {
       const apiDoc = await adminDb.collection("config").doc("whatsapp_api").get();
@@ -29,7 +29,7 @@ export async function GET(req: Request) {
         if (apiData?.whatsappAdminPassword) whatsappAdminPassword = apiData.whatsappAdminPassword;
       }
     } catch (dbErr) {
-      console.warn("[WhatsApp GET] Firestore config/whatsapp_api read failed, falling back to process.env:", dbErr);
+      console.warn("[WhatsApp GET] Firestore CPANEL test config could not be read:", dbErr);
     }
 
     const hasLiveConfig = !!whatsappApiUrl && !!whatsappInstanceId;
@@ -238,9 +238,9 @@ export async function POST(req: Request) {
     }
 
     // Load active config dynamically
-    let whatsappApiUrl = process.env.WHATSAPP_API_URL || "";
-    let whatsappApiKey = process.env.WHATSAPP_API_KEY || "";
-    let whatsappInstanceId = process.env.WHATSAPP_INSTANCE_ID || "";
+    let whatsappApiUrl = "";
+    let whatsappApiKey = "";
+    let whatsappInstanceId = "";
 
     try {
       const apiDoc = await adminDb.collection("config").doc("whatsapp_api").get();
@@ -251,7 +251,7 @@ export async function POST(req: Request) {
         if (apiData?.whatsappInstanceId) whatsappInstanceId = apiData.whatsappInstanceId;
       }
     } catch (dbErr) {
-      console.warn("[WhatsApp POST] Firestore config/whatsapp_api fetch failed:", dbErr);
+      console.warn("[WhatsApp POST] Firestore CPANEL test config fetch failed:", dbErr);
     }
 
     const hasLiveConfig = !!whatsappApiUrl && !!whatsappInstanceId;
