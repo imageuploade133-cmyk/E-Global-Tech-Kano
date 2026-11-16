@@ -64,7 +64,7 @@ export async function POST(req: Request) {
         }, { status: 400 });
       }
 
-      const gatewayUrl = (process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055").replace(/\\/+$/, "");
+      const gatewayUrl = (process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055").replace(/\/+$, "");
       const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
       if (!gatewayApiKey) {
         await adminDb.collection("login_2fa_otps").doc(uid).delete().catch(() => undefined);
