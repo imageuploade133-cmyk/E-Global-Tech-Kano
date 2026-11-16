@@ -50,7 +50,7 @@ async function ensureVmSessionCookie(config: WhatsappConfig): Promise<string> {
 }
 
 /**
- * Resolves server-side WhatsApp environment configuration.
+ * Resolves CPANEL-only WhatsApp test configuration from Firestore. OTP delivery is handled by the backend VM and does not use this helper.
  * Uses 5-minute in-memory cache to prevent repetitive Firestore reads on every message/OTP dispatch.
  */
 export async function getWhatsappServerConfig(): Promise<WhatsappConfig> {
@@ -59,11 +59,11 @@ export async function getWhatsappServerConfig(): Promise<WhatsappConfig> {
     return cachedWhatsappConfig.data;
   }
 
-  let apiUrl = (process.env.WHATSAPP_API_URL || "https://whatsapp-b5os.onrender.com").replace(/\/+$/, "");
-  let apiKey = process.env.WHATSAPP_API_KEY || "";
-  let instanceId = process.env.WHATSAPP_INSTANCE_ID || "default";
-  let adminUsername = process.env.WHATSAPP_ADMIN_USERNAME || "admin";
-  let adminPassword = process.env.WHATSAPP_ADMIN_PASSWORD || "";
+  let apiUrl = "";
+  let apiKey = "";
+  let instanceId = "";
+  let adminUsername = "";
+  let adminPassword = "";
 
   try {
     const docSnap = await adminDb.collection("config").doc("whatsapp_api").get();
