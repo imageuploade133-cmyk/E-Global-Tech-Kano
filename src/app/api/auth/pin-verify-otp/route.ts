@@ -8,82 +8,42 @@ const GATEWAY_URL = getGatewayUrl();
 
 export async function POST(req: Request) {
   try {
-    let authUser = null;
-    try {
-      authUser = await authenticateUserRequest(req);
-    } catch {
-      // Optional auth token parse
+    const authUser = await authenticateUserRequest(req).catch(() => null);
+    if (!authUser?.uid) {
+      return NextResponse.json({ error: "Authentication required to verify OTP." }, { status: 401 });
     }
-
-    const authHeader = req.headers.get("Authorization") || "";
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     const body = await req.json().catch(() => ({}));
-    const { otpCode, channel = "whatsapp" } = body;
-
-    const now = Date.now();
-
-    // =========================================================================
-    // CHANNEL 1: EMAIL OTP VERIFICATION (Handled directly in Next.js)
-    // =========================================================================
-    if (channel === "email") {
-      if (!authUser || !authUser.uid) {
-        return NextResponse.json({ error: "Authentication required to verify OTP." }, { status: 401 });
-      }
-
-      if (!otpCode || String(otpCode).trim().length !== 6) {
-        return NextResponse.json({ error: "Please enter a valid 6-digit OTP code." }, { status: 400 });
-      }
-
-      const uid = authUser.uid;
-      const docRef = adminDb.collection("otp_sessions").doc(`pin_reset_email_${uid}`);
-      const docSnap = await docRef.get();
-
-      if (!docSnap.exists) {
-        return NextResponse.json({ error: "No active Email OTP session found. Please request a new code." }, { status: 400 });
-      }
-
-      const data = docSnap.data() || {};
-
-      if (data.consumed) {
-        return NextResponse.json({ error: "This OTP code has already been consumed. Please request a new code." }, { status: 400 });
-      }
-
-      if (data.expiresAtMs && now > data.expiresAtMs) {
-        return NextResponse.json({ error: "OTP code has expired. Please request a new code." }, { status: 400 });
-      }
-
-      let attempts = Number(data.attempts) || 0;
-      if (attempts >= 5) {
-        return NextResponse.json({ error: "Maximum OTP attempts exceeded. Please request a new code." }, { status: 429 });
-      }
-
-      // Verify HMAC-SHA256 OTP Hash
-      const HMAC_SECRET = process.env.CPANEL_SESSION_SECRET || process.env.JWT_SECRET || "pin_reset_otp_secret_key";
-      const submittedHash = crypto.createHmac("sha256", HMAC_SECRET).update(String(otpCode).trim()).digest("hex");
-
-      if (submittedHash !== data.otpHash) {
-        attempts += 1;
-        await docRef.update({ attempts });
-        return NextResponse.json({ error: `Incorrect OTP code. ${Math.max(0, 5 - attempts)} attempts remaining.` }, { status: 400 });
-      }
-
-      // Mark OTP session as verified in Firestore
-      await docRef.update({
-        verified: true,
-        verifiedAtMs: now,
-        verifiedAt: new Date(now).toISOString(),
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: "Email OTP verified successfully. Proceed to reset PIN."
-      });
+    const otpCode = String(body.otpCode || "").trim();
+    const channel = body.channel === "email" ? "email" : "whatsapp";
+    if (!/^[0-9]{6}$/.test(otpCode)) {
+      return NextResponse.json({ error: "Please enter a valid 6-digit OTP code." }, { status: 400 });
     }
 
-    // =========================================================================
-    // CHANNEL 2: WHATSAPP OTP VERIFICATION (Proxy to Payment Gateway VM)
-    // =========================================================================
+    const userSnap = await adminDb.collection("users").doc(authUser.uid).get();
+    if (!userSnap.exists) {
+      return NextResponse.json({ error: "User profile not found." }, { status: 404 });
+    }
+
+    const userData = userSnap.data() || {};
+    const payload: Record<string, any> = { channel, otpCode };
+    if (channel === "email") {
+      payload.email = String(userData.email || userData.emailAddress || authUser.email || "").trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+        return NextResponse.json({ error: "No valid registered email address found on this profile." }, { status: 400 });
+      }
+    } else {
+      payload.phoneNumber = String(userData.phoneNumber || userData.phone || "").trim();
+      if (!payload.phoneNumber) {
+        return NextResponse.json({ error: "No registered phone number found on this profile." }, { status: 400 });
+      }
+    }
+
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
+    if (!gatewayApiKey) {
+      return NextResponse.json({ error: "OTP gateway authentication is not configured. Please contact support." }, { status: 503 });
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 50000);
 
@@ -174,17 +134,15 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: result.message || "OTP verified successfully. Proceed to reset PIN."
+      message: result.message || "OTP verified successfully. Proceed to reset PIN.",
     });
-
   } catch (err: unknown) {
     const error = err as Error;
-    console.error("[PIN Reset Verify OTP Proxy] Error:", error);
     const isTimeout = error.name === "AbortError";
-    const errorMessage = isTimeout
-      ? "Server connection timed out. Please try again in a few seconds."
-      : (error.message || "Failed to verify OTP.");
-
-    return NextResponse.json({ error: errorMessage }, { status: isTimeout ? 504 : 500 });
+    console.error("[PIN Reset Verify OTP Proxy] Error:", error.message);
+    return NextResponse.json(
+      { error: isTimeout ? "OTP gateway connection timed out. Please try again." : "OTP gateway is currently unavailable. Please try again." },
+      { status: isTimeout ? 504 : 502 }
+    );
   }
 }

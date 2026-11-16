@@ -17,13 +17,13 @@ export async function GET(req: Request) {
     }
     const { uid } = perm.auth;
 
-    let emailApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-b5os.onrender.com/api/email/send";
-    let emailApiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
-    let emailInstanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
-    let emailAdminUsername = process.env.EMAIL_ADMIN_USERNAME || process.env.WHATSAPP_ADMIN_USERNAME || "";
+    let emailApiUrl = "";
+    let emailApiKey = "";
+    let emailInstanceId = "";
+    let emailAdminUsername = "";
     let senderName = "E-Global Pay";
     let senderEmail = "no-reply@eglobalpay.com";
-    let status = "CONNECTED";
+    let status = "DISCONNECTED";
     let grantedScopes = ["email.send", "email.otp", "email.templates", "email.logs"];
     let dailyLimit = "2,000,000";
     let dailyUsed = 1;
@@ -141,8 +141,8 @@ export async function POST(req: Request) {
 
       const newKeyId = `key-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       const cleanKey = String(emailApiKey).trim();
-      const cleanUrl = String(emailApiUrl || process.env.EMAIL_API_URL || "https://whatsapp-b5os.onrender.com/api/email/send").trim();
-      const cleanInst = String(emailInstanceId || process.env.EMAIL_INSTANCE_ID || "inst_33647102").trim();
+      const cleanUrl = String(emailApiUrl || "").trim();
+      const cleanInst = String(emailInstanceId || "").trim();
 
       const newKeyRecord = {
         id: newKeyId,
@@ -381,11 +381,11 @@ export async function POST(req: Request) {
       const messageBody = customMessage?.trim() || "This is a live test email sent from your E-Global Control Panel Email Gateway configuration tool.";
 
       // Read active configuration
-      let targetApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-b5os.onrender.com/api/email/send";
-      let targetApiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
-      let targetInstanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
-      let targetAdminUsername = process.env.EMAIL_ADMIN_USERNAME || process.env.WHATSAPP_ADMIN_USERNAME || "";
-      let targetAdminPassword = process.env.EMAIL_ADMIN_PASSWORD || process.env.WHATSAPP_ADMIN_PASSWORD || "";
+      let targetApiUrl = "";
+      let targetApiKey = "";
+      let targetInstanceId = "";
+      let targetAdminUsername = "";
+      let targetAdminPassword = "";
       let targetSenderName = "E-Global Pay";
       let targetSenderEmail = "no-reply@eglobalpay.com";
 
@@ -403,6 +403,13 @@ export async function POST(req: Request) {
         }
       } catch (err) {
         console.warn("[Email Connect Test] Config load warning:", err);
+      }
+
+      if (!targetApiUrl || !targetApiKey) {
+        return NextResponse.json({
+          success: false,
+          error: "Email test provider is not configured. Save an Email Connect test configuration first. OTP delivery uses the backend VM and is not affected by this setting.",
+        }, { status: 400 });
       }
 
       console.log(`[Email Connect Test] Dispatching test connection email to: ${recipient} via ${targetApiUrl}`);

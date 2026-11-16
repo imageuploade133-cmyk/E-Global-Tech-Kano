@@ -120,6 +120,18 @@ export async function POST(req: Request) {
             </div>
           `,
         });
+      } catch (dispatchError) {
+        await adminDb.collection("login_2fa_otps").doc(uid).delete().catch(() => undefined);
+        console.error("[Login 2FA OTP] VM dispatch connection failed:", dispatchError);
+        return NextResponse.json({ error: "OTP gateway is unavailable. Please try again." }, { status: 502 });
+      }
+
+      const dispatchData = await dispatchResponse.json().catch(() => ({}));
+      if (!dispatchResponse.ok || !dispatchData.success) {
+        await adminDb.collection("login_2fa_otps").doc(uid).delete().catch(() => undefined);
+        return NextResponse.json({
+          error: dispatchData.message || dispatchData.error || "Failed to deliver 2FA verification code through the backend VM.",
+        }, { status: dispatchResponse.status || 502 });
       }
 
       return NextResponse.json({
