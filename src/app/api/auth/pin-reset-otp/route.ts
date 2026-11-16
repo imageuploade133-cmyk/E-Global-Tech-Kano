@@ -46,6 +46,8 @@ export async function POST(req: Request) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 50000);
 
+    const authHeader = req.headers.get("Authorization") || "";
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "Authorization": authHeader,
