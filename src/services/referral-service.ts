@@ -30,13 +30,28 @@ export class ReferralService {
     if (!referralCode) return;
 
     try {
-      const trimmedCode = referralCode.trim().toUpperCase();
+      let trimmedCode = referralCode.trim().toUpperCase();
+      // Normalize code format: if user typed numbers only e.g. "123456", convert to "ET-123456"
+      if (/^\d+$/.test(trimmedCode)) {
+        trimmedCode = `ET-${trimmedCode}`;
+      } else if (trimmedCode.startsWith("ET") && !trimmedCode.startsWith("ET-")) {
+        trimmedCode = `ET-${trimmedCode.slice(2)}`;
+      }
 
       // Look up referring user by their accountId
-      const referrerQuery = await adminDb.collection("users")
+      let referrerQuery = await adminDb.collection("users")
         .where("accountId", "==", trimmedCode)
         .limit(1)
         .get();
+
+      // Fallback check if accountId was saved without hyphen e.g. "ET123456" or just number
+      if (referrerQuery.empty && trimmedCode.startsWith("ET-")) {
+        const noHyphenCode = `ET${trimmedCode.slice(3)}`;
+        referrerQuery = await adminDb.collection("users")
+          .where("accountId", "==", noHyphenCode)
+          .limit(1)
+          .get();
+      }
 
       if (referrerQuery.empty) {
         console.log(`[ReferralService] Referrer accountId ${trimmedCode} not found.`);
@@ -117,10 +132,11 @@ export class ReferralService {
       const referralData = referralDoc.data() as ReferralRecord;
       const referralId = referralDoc.id;
 
-      // Check B's successful deposit transactions in the ledger
+      // Check B's successful deposit transactions in the ledger across all deposit types
+      const depositTypes = ["DEPOSIT", "VIRTUAL_ACCOUNT_DEPOSIT", "WALLET_FUNDING", "ADMIN_DEPOSIT"];
       const txQuery = await adminDb.collection("transactions")
         .where("userId", "==", referredUid)
-        .where("type", "==", "DEPOSIT")
+        .where("type", "in", depositTypes)
         .where("status", "==", "SUCCESS")
         .get();
 
@@ -239,10 +255,11 @@ export class ReferralService {
         }
       }
 
-      // 2. Check cumulative successful deposits
+      // 2. Check cumulative successful deposits across all deposit types
+      const depositTypes = ["DEPOSIT", "VIRTUAL_ACCOUNT_DEPOSIT", "WALLET_FUNDING", "ADMIN_DEPOSIT"];
       const txQuery = await adminDb.collection("transactions")
         .where("userId", "==", userId)
-        .where("type", "==", "DEPOSIT")
+        .where("type", "in", depositTypes)
         .where("status", "==", "SUCCESS")
         .get();
 

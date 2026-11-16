@@ -8,6 +8,7 @@ import { calculateTransferMarkupFee, TransferTieredMarkup } from "@/lib/transfer
 import { getGlobalMinTransferAmount } from "@/lib/global-limits-util";
 import { resolveInternalUserByAccount } from "@/lib/user-resolver";
 import bcrypt from "bcryptjs";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 interface BulkRecipient {
   amount: number;
@@ -184,7 +185,7 @@ export async function POST(req: Request) {
         }
       }
 
-      const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+      const gatewayUrl = getGatewayUrl();
 
       let finalTotalFees = 0;
       let finalTotalProviderFees = 0;
@@ -342,7 +343,7 @@ export async function POST(req: Request) {
       };
     });
 
-    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+    const gatewayUrl = getGatewayUrl();
 
     // 5. Call Google Cloud Payment Gateway S2S Bulk Transfer API
     try {
@@ -361,7 +362,16 @@ export async function POST(req: Request) {
         }),
       });
 
-      const gatewayData = await gatewayRes.json();
+      const gatewayText = await gatewayRes.text().catch(() => "");
+      let gatewayData: Record<string, any> = {};
+      try {
+        gatewayData = gatewayText ? JSON.parse(gatewayText) : {};
+      } catch {
+        if (gatewayText.includes("Cannot POST") || gatewayText.includes("<!DOCTYPE") || gatewayRes.status === 404) {
+          throw new Error("Payment Gateway service is temporarily unreachable or returned an invalid response.");
+        }
+        throw new Error(gatewayText || "Payment Gateway returned non-JSON response.");
+      }
 
       if (gatewayRes.ok && gatewayData.success) {
         logPaymentEvent({

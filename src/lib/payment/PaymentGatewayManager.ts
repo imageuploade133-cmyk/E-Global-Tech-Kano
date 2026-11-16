@@ -1,6 +1,7 @@
 import { adminDb } from "../firebase-admin";
 import { logPaymentEvent } from "../payment-logger";
 import { safeParseJson } from "@/lib/utils";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 export interface GatewayConfig {
   id: string;
@@ -104,7 +105,7 @@ export class PaymentGatewayManager {
     feature: keyof GatewayConfig["features"];
   }): Promise<{ name: string; payBills: (payload: BillPaymentPayload, idToken?: string) => Promise<BillPaymentResponse> }> {
     console.log(`[PaymentGatewayManager] Selecting gateway for feature: ${params.feature}`);
-    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+    const gatewayUrl = getGatewayUrl();
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     // Option 1 Design: If feature is airtime or data, route to Clubkonnect VTU endpoint on the Payment Gateway

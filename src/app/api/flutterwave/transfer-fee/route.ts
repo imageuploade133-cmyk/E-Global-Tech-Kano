@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { authenticateUserRequest, verifyUserKycApproved } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { calculateTransferMarkupFee, TransferTieredMarkup } from "@/lib/transfer-markup-util";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 export async function GET(req: Request) {
   const reqId = `fee-req-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
-  const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+  const gatewayUrl = getGatewayUrl();
 
   let uid = "";
   // 1. Authenticate user to ensure secure access (no hackers/scammers)
@@ -36,7 +37,81 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Invalid transfer amount." }, { status: 400 });
     }
 
-    // 3. Fetch custom global markup configurations securely from Firestore config collection
+    // 3. Fetch global TRN fee configuration (ON/OFF switch and free transfers quota)
+    let enableTransferFee = true;
+    let freeTransfersQuota = 0;
+    let freeTransferResetPeriod = "NEVER";
+    let showFreeTransfersIndicator = true;
+
+    const trnFeeRef = adminDb.collection("config").doc("trn_fee_config");
+    const trnFeeSnap = await trnFeeRef.get();
+    if (trnFeeSnap.exists) {
+      const feeData = trnFeeSnap.data() || {};
+      enableTransferFee = feeData.enableTransferFee !== false;
+      freeTransfersQuota = Math.max(0, Number(feeData.freeTransfersQuota) || 0);
+      freeTransferResetPeriod = feeData.freeTransferResetPeriod || "NEVER";
+      showFreeTransfersIndicator = feeData.showFreeTransfersIndicator !== false;
+    }
+
+    // Check if global transfer fees are completely OFF
+    if (!enableTransferFee) {
+      console.log(`[Transfer-Fee API] [${reqId}] Global transfer fees are OFF. Returning ₦0.00 fee.`);
+      return NextResponse.json({
+        success: true,
+        providerFee: 0,
+        adminCommission: 0,
+        fee: 0,
+        totalDebit: amount,
+        isFreeTransfer: true,
+        freeReason: "Global transfer fees disabled by administrator",
+        showFreeIndicator: showFreeTransfersIndicator,
+      });
+    }
+
+    // Check if user qualifies for free transfer quota
+    if (freeTransfersQuota > 0 && uid) {
+      const userSnap = await adminDb.collection("users").doc(uid).get();
+      if (userSnap.exists) {
+        const userData = userSnap.data() || {};
+        let usedFreeCount = Number(userData.usedFreeTransfers) || 0;
+        const lastReset = userData.lastFreeTransferResetDate ? new Date(userData.lastFreeTransferResetDate) : null;
+        const now = new Date();
+
+        // Evaluate reset frequency
+        let shouldReset = false;
+        if (lastReset) {
+          if (freeTransferResetPeriod === "DAILY") {
+            shouldReset = lastReset.toDateString() !== now.toDateString();
+          } else if (freeTransferResetPeriod === "WEEKLY") {
+            const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+            shouldReset = now.getTime() - lastReset.getTime() >= oneWeekMs;
+          } else if (freeTransferResetPeriod === "MONTHLY") {
+            shouldReset = lastReset.getMonth() !== now.getMonth() || lastReset.getFullYear() !== now.getFullYear();
+          }
+        }
+
+        if (shouldReset) {
+          usedFreeCount = 0;
+        }
+
+        if (usedFreeCount < freeTransfersQuota) {
+          console.log(`[Transfer-Fee API] [${reqId}] User ${uid} qualifies for free transfer (${usedFreeCount + 1}/${freeTransfersQuota}). Returning ₦0.00 fee.`);
+          return NextResponse.json({
+            success: true,
+            providerFee: 0,
+            adminCommission: 0,
+            fee: 0,
+            totalDebit: amount,
+            isFreeTransfer: true,
+            freeReason: `Free transfer quota (${freeTransfersQuota - usedFreeCount} remaining)`,
+            remainingFreeTransfers: freeTransfersQuota - usedFreeCount,
+            showFreeIndicator: showFreeTransfersIndicator,
+          });
+        }
+      }
+    }
+
+    // 4. Fetch custom global markup configurations securely from Firestore config collection
     let defaultTransferProfitMargin = 0;
     let defaultBulkTransferProfitMargin = 0;
     let transferTieredMargins: TransferTieredMarkup[] = [];
@@ -93,7 +168,13 @@ export async function GET(req: Request) {
               "Content-Type": "application/json",
             },
           });
-          const feeData = await feeRes.json();
+          const feeText = await feeRes.text().catch(() => "");
+          let feeData: Record<string, any> = {};
+          try {
+            feeData = feeText ? JSON.parse(feeText) : {};
+          } catch {
+            feeData = {};
+          }
           if (feeRes.ok && feeData.success) {
             baseFee = Number(feeData.fee) || 10.00;
           }

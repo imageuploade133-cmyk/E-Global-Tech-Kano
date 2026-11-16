@@ -906,16 +906,27 @@ export function TierUpgradeDrawerModal({
         )}
       </AnimatePresence>
 
-      {/* 4-Digit Transaction PIN Verification Pad Modal */}
+      {/* 4-Digit Transaction PIN Verification Bottom Drawer Model */}
       <AnimatePresence>
         {isPinModalOpen && (
-          <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <>
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-sm bg-white rounded-3xl p-6 text-center shadow-2xl space-y-5 border border-gray-100 font-hanken text-black"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsPinModalOpen(false)}
+              className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] p-6 pb-8 z-[100001] flex flex-col items-center text-center text-black font-hanken select-none shadow-2xl border-t border-gray-100"
             >
+              {/* Drawer Grab Bar Handle */}
+              <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-4 shrink-0" />
+
               {is2faStage ? (
                 <TwoFactorOtpVerificationView
                   user={user}
@@ -932,7 +943,7 @@ export function TierUpgradeDrawerModal({
                 />
               ) : (
                 <>
-                  <div className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center mx-auto">
+                  <div className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center shrink-0 mb-1">
                     <span className="material-symbols-outlined text-[24px]">lock</span>
                   </div>
 
@@ -959,14 +970,14 @@ export function TierUpgradeDrawerModal({
                   </div>
 
                   {/* Numeric Keypad Grid */}
-                  <div className="grid grid-cols-3 gap-2 pt-2">
+                  <div className="grid grid-cols-3 gap-2.5 pt-2 w-full max-w-xs">
                     {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
                       <button
                         key={num}
                         type="button"
                         disabled={isVerifyingPin}
                         onClick={() => handlePinDigitPress(num)}
-                        className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                        className="py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-2xl font-black text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                       >
                         {num}
                       </button>
@@ -975,7 +986,7 @@ export function TierUpgradeDrawerModal({
                       type="button"
                       disabled={isVerifyingPin}
                       onClick={handlePinClear}
-                      className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-xs uppercase text-gray-600 active:scale-95 transition-all cursor-pointer"
+                      className="py-3 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-2xl font-bold text-xs uppercase text-gray-600 active:scale-95 transition-all cursor-pointer"
                     >
                       CLEAR
                     </button>
@@ -983,7 +994,7 @@ export function TierUpgradeDrawerModal({
                       type="button"
                       disabled={isVerifyingPin}
                       onClick={() => handlePinDigitPress("0")}
-                      className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                      className="py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-2xl font-black text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                     >
                       0
                     </button>
@@ -991,7 +1002,7 @@ export function TierUpgradeDrawerModal({
                       type="button"
                       disabled={isVerifyingPin}
                       onClick={handlePinBackspace}
-                      className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                      className="py-3 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-2xl font-bold text-lg text-black active:scale-95 transition-all cursor-pointer flex items-center justify-center"
                     >
                       <span className="material-symbols-outlined text-[20px]">backspace</span>
                     </button>
@@ -1000,14 +1011,14 @@ export function TierUpgradeDrawerModal({
                   <button
                     type="button"
                     onClick={() => setIsPinModalOpen(false)}
-                    className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase rounded-2xl cursor-pointer active:scale-95 transition-all"
+                    className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase rounded-2xl cursor-pointer active:scale-95 transition-all mt-2"
                   >
                     Cancel
                   </button>
                 </>
               )}
             </motion.div>
-          </div>
+          </>
         )}
       </AnimatePresence>
     </AnimatePresence>,

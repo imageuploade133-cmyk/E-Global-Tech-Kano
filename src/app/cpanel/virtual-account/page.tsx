@@ -132,17 +132,31 @@ export default function VirtualAccountPage() {
               <div><span className="text-gray-500">NIN</span><div className="font-semibold">{selected.nin||"Not available"}</div></div>
             </div>
 
-            <div className={cn("rounded-2xl border p-5", isDark ? "border-gray-700" : "border-gray-200")}>
+            <div className={cn("rounded-2xl border p-5 space-y-4", isDark ? "border-gray-700 bg-gray-900/40" : "border-gray-200 bg-gray-50/50")}>
               <div className="flex justify-between gap-4">
-                <div><p className="text-xs uppercase font-black text-gray-400">Current Virtual Account</p>
-                  {selected.account ? <><p className="text-xl font-black mt-2">{selected.account.accountNumber}</p><p className="font-semibold">{selected.account.accountName}</p><p className="text-sm text-gray-500">{selected.account.bankName} · {selected.account.currency}</p></> :
-                  <p className="mt-2 text-gray-500">No active account found.</p>}
+                <div>
+                  <p className="text-xs uppercase font-black text-gray-400">Current Virtual Account</p>
+                  {selected.account ? (
+                    <>
+                      <p className="text-2xl font-black mt-2 text-[#FC7A00] font-mono tracking-wider">{selected.account.accountNumber}</p>
+                      <p className="font-bold text-base mt-1">{selected.account.accountName}</p>
+                      <p className="text-sm text-gray-500">{selected.account.bankName} · {selected.account.currency}</p>
+
+                      <div className="mt-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs font-semibold text-orange-600 dark:text-orange-400">
+                        <span className="font-bold">Banking Lookup Narration:</span> {selected.name} - E-Tech
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-gray-500">No active account found.</p>
+                  )}
                 </div>
-                {selected.account?.status==="active" && <span className="text-xs font-black text-green-600">ACTIVE</span>}
+                {selected.account?.status==="active" && <span className="text-xs font-black px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 h-fit">ACTIVE</span>}
               </div>
-              {selected.account && <button onClick={()=>setShowConfirm(true)} className="mt-5 rounded-xl bg-black px-5 py-3 text-sm font-black text-white hover:bg-orange-500">
-                Generate New Account
-              </button>}
+              {selected.account && (
+                <button onClick={()=>setShowConfirm(true)} className="w-full sm:w-auto rounded-xl bg-[#FC7A00] hover:bg-[#e06600] px-5 py-3 text-xs font-extrabold uppercase tracking-wider text-white transition-all shadow-md">
+                  Replace & Regenerate Account
+                </button>
+              )}
             </div>
 
             <div>
@@ -166,15 +180,50 @@ export default function VirtualAccountPage() {
       )}
 
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className={cn("w-full max-w-md rounded-2xl p-6", isDark ? "bg-[#111827] border border-gray-800" : "bg-white")}>
-            <h2 className="text-xl font-black">Generate New Virtual Account?</h2>
-            <p className="text-sm text-gray-500 mt-2">The current account will be deactivated and the new account will become active. The user&apos;s existing verified NIN/BVN will be reused. Wallet balance will not change.</p>
-            <input value={confirm} onChange={e=>setConfirm(e.target.value.toUpperCase())} placeholder="Type GENERATE"
-              className="mt-5 w-full rounded-xl border px-4 py-3 dark:bg-gray-950 dark:border-gray-700"/>
-            <div className="flex gap-3 mt-4">
-              <button onClick={()=>{setShowConfirm(false);setConfirm("")}} disabled={replacing} className="flex-1 rounded-xl border px-4 py-3 font-bold">Cancel</button>
-              <button onClick={replaceAccount} disabled={confirm!=="GENERATE"||replacing} className="flex-1 rounded-xl bg-orange-500 px-4 py-3 font-black text-white disabled:opacity-40">{replacing?"Generating...":"Generate"}</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className={cn("w-full max-w-md rounded-2xl p-6 shadow-2xl border", isDark ? "bg-[#111827] border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900")}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2.5 rounded-xl bg-orange-500/10 text-[#FC7A00]">
+                <span className="material-symbols-outlined text-2xl">account_balance_wallet</span>
+              </div>
+              <div>
+                <h2 className="text-lg font-black">Replace & Regenerate Virtual Account?</h2>
+                <p className="text-xs text-gray-500">Customer: <strong className="text-gray-200">{selected.name}</strong></p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-500 leading-relaxed">
+              The current account will be deactivated at Flutterwave and a new permanent account will be provisioned. The new account will display as <strong className="text-[#FC7A00] font-semibold">{selected.name} - E-Tech</strong> in external banking apps. Wallet balance will remain untouched.
+            </p>
+
+            <div className="mt-4 p-3 rounded-xl bg-gray-100 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 text-xs">
+              <span className="font-bold text-gray-700 dark:text-gray-300">Confirmation Required:</span>
+              <p className="text-gray-500 mt-0.5">Type <code className="font-mono font-bold text-[#FC7A00]">GENERATE</code> below to proceed.</p>
+            </div>
+
+            <input
+              value={confirm}
+              onChange={e=>setConfirm(e.target.value.toUpperCase())}
+              placeholder="Type GENERATE"
+              className={cn("mt-4 w-full rounded-xl border px-4 py-3 text-xs font-mono font-bold tracking-widest outline-none focus:ring-1 focus:ring-[#FC7A00]", isDark ? "bg-gray-950 border-gray-700 text-white" : "bg-gray-50 border-gray-300 text-gray-900")}
+            />
+
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={()=>{setShowConfirm(false);setConfirm("")}}
+                disabled={replacing}
+                className={cn("flex-1 rounded-xl border px-4 py-3 text-xs font-bold transition-all", isDark ? "border-gray-700 hover:bg-gray-800" : "border-gray-200 hover:bg-gray-100")}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={replaceAccount}
+                disabled={confirm!=="GENERATE"||replacing}
+                className="flex-1 rounded-xl bg-[#FC7A00] hover:bg-[#e06600] px-4 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-40 transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                {replacing && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                <span>{replacing ? "Generating..." : "Generate Account"}</span>
+              </button>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { safeParseJson } from "@/lib/utils";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 const FALLBACK_CABLE_PACKAGES: Record<string, any[]> = {
   "dstv": [
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
 
     const idToken = req.headers.get("Authorization")?.split("Bearer ")[1] || "mock-token";
 
-    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+    const gatewayUrl = getGatewayUrl();
     const apiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     const headers: Record<string, string> = {

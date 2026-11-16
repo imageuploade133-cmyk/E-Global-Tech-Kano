@@ -51,6 +51,7 @@ interface StoreSettings {
   bannerMarginBottom?: number;
   bannerHeightMobile?: number;
   bannerHeightDesktop?: number;
+  productCardImageMode?: "cover" | "contain";
 }
 
 function ButtonSpinner() {
@@ -85,6 +86,7 @@ function CpanelStoreSettingsPageContent() {
   const [enableProductVideo, setEnableProductVideo] = useState(true);
   const [hideCardPayment, setHideCardPayment] = useState(false);
   const [enablePickup, setEnablePickup] = useState(false);
+  const [productCardImageMode, setProductCardImageMode] = useState<"cover" | "contain">("cover");
   const [isUploadingStoreLogo, setIsUploadingStoreLogo] = useState(false);
   const [borderColor, setBorderColor] = useState("#FC7A00");
   const [borderOpacity, setBorderOpacity] = useState(100);
@@ -188,6 +190,7 @@ function CpanelStoreSettingsPageContent() {
         setEnableProductVideo(data.settings.enableProductVideo !== false);
         setHideCardPayment(Boolean(data.settings.hideCardPayment));
         setEnablePickup(Boolean(data.settings.enablePickup));
+        setProductCardImageMode(data.settings.productCardImageMode === "contain" ? "contain" : "cover");
         setBorderColor(data.settings.borderColor || "#FC7A00");
         setBorderOpacity(data.settings.borderOpacity ?? 100);
         setHideBorders(Boolean(data.settings.hideBorders));
@@ -269,6 +272,7 @@ function CpanelStoreSettingsPageContent() {
             enableProductVideo,
             hideCardPayment,
             enablePickup,
+            productCardImageMode,
             borderColor,
             borderOpacity,
             hideBorders,
@@ -374,6 +378,58 @@ function CpanelStoreSettingsPageContent() {
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-4">
+
+              {/* Product Card Image Display Mode (Crop / Fill vs Contain) */}
+              <div className="p-4 rounded-2xl border border-orange-500/20 bg-orange-500/5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase text-[#FC7A00] flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">crop</span>
+                      Product Card Image Crop & Display Mode
+                    </label>
+                    <span className="text-[10px] text-gray-500 font-medium block mt-0.5">
+                      Choose whether product card thumbnails crop to fill box cleanly (Crop / Fill) or fit entire image with padding (Contain)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => promptResetConfirmation("Card Image Display Mode", () => setProductCardImageMode("cover"))}
+                    className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
+                  >
+                    Reset Default
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setProductCardImageMode("cover")}
+                    className={cn(
+                      "py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border transition-all flex items-center justify-center gap-2",
+                      productCardImageMode === "cover"
+                        ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-2xs"
+                        : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">crop</span>
+                    <span>Crop / Fill Box</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setProductCardImageMode("contain")}
+                    className={cn(
+                      "py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border transition-all flex items-center justify-center gap-2",
+                      productCardImageMode === "contain"
+                        ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-2xs"
+                        : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">crop_free</span>
+                    <span>Fit Entire Image</span>
+                  </button>
+                </div>
+              </div>
 
               {/* Product Page Header Title Alignment Control */}
               <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-2">

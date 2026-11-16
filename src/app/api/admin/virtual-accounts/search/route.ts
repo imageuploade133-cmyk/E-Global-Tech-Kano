@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { mintFirebaseIdToken } from "@/lib/admin-auth";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+const GATEWAY_URL = getGatewayUrl();
 const GATEWAY_KEY = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
 
 async function gatewayFetch(url: string, init: RequestInit, uid: string) {

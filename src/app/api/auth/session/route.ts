@@ -26,8 +26,9 @@ import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import crypto from "crypto";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+const GATEWAY_URL = getGatewayUrl();
 const GATEWAY_API_KEY = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
 
 // Helper to mask sensitive destinations (e.g. 23480***1234 or j***s@gmail.com)
@@ -143,6 +144,18 @@ export async function POST(req: Request) {
 
     const userRef = adminDb.collection("users").doc(uid);
     const adminUserRef = adminDb.collection("admin_users").doc(uid);
+
+    // Check if user account is banned or suspended globally
+    const userDocCheck = await userRef.get();
+    if (userDocCheck.exists) {
+      const uDataCheck = userDocCheck.data() || {};
+      if (uDataCheck.isBanned === true || uDataCheck.status === "BANNED" || uDataCheck.status === "banned") {
+        return NextResponse.json({
+          error: "Your account has been banned. Please contact support.",
+          isBanned: true,
+        }, { status: 403 });
+      }
+    }
 
     // =========================================================================
     // ACTION 1: VERIFY NEW DEVICE OTP CHALLENGE & ACTIVATION

@@ -581,6 +581,15 @@ export class WalletService {
 
     transaction.set(ledgerRef, ledgerRecord);
 
+    // Trigger async referral check for deposit credits
+    if (isDepositType && ucCurrency === "NGN") {
+      import("./referral-service").then(({ ReferralService }) => {
+        ReferralService.checkAndProcessReferral(userId).catch((err) => {
+          console.error("[WalletService] Async checkAndProcessReferral error:", err);
+        });
+      });
+    }
+
     return {
       previousBalance: currentBalance,
       newBalance,

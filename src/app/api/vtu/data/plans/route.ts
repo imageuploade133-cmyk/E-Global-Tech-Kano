@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { safeParseJson } from "@/lib/utils";
 import { adminDb } from "@/lib/firebase-admin";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 export async function GET(req: Request) {
   let network = "";
@@ -20,7 +21,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     network = searchParams.get("network") || "";
 
-    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+    const gatewayUrl = getGatewayUrl();
     const apiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     // Retrieve admin global custom profit margin setting from Firestore to apply markup dynamically

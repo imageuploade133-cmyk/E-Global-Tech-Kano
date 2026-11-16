@@ -1,7 +1,8 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { safeParseJson } from "@/lib/utils";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const BANKS_API_URL = "https://etechglobalhub.duckdns.org/api/flutterwave/banks";
+const getBanksApiUrl = () => `${getGatewayUrl()}/api/flutterwave/banks`;
 
 export interface BankDoc {
   id: string;
@@ -104,7 +105,7 @@ export class BankService {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
-        response = await fetch(BANKS_API_URL, {
+        response = await fetch(getBanksApiUrl(), {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${idToken || ""}`,

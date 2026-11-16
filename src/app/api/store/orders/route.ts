@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { checkServerFeatureStatus } from "@/lib/feature-toggle-server";
 import bcrypt from "bcryptjs";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 // Helper function to auto-clean stale unpaid/abandoned orders older than 24 hours & restore stock if needed
 async function autoCleanStaleAbandonedOrders() {
@@ -223,7 +224,7 @@ export async function POST(req: Request) {
       });
 
       // Generate card payment checkout link
-      const gatewayUrl = (process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org").replace(/\/$/, "");
+      const gatewayUrl = getGatewayUrl();
       const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
       const txRef = `TX-STORE-${orderId}`;

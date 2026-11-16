@@ -97,6 +97,7 @@ export interface StoreSettings {
   enableProductVideo?: boolean;
   hideCardPayment?: boolean;
   enablePickup?: boolean;
+  productCardImageMode?: "cover" | "contain";
 }
 
 export interface CartItem {

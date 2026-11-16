@@ -9,7 +9,8 @@ import { TransactionReceipt, Transaction } from "@/components/wallet/Transaction
 import { TransactionIcon } from "@/components/wallet/TransactionIcon";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { db } from "@/lib/firebase";
-import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, getDocs, startAfter, onSnapshot, getDoc, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { parseTransactionDoc, processPendingDocChanges, applyPendingTransactionsUpdate } from "@/lib/transaction-history-utils";
 import { toast } from "sonner";
 import { getTransactionLedgerStatus, isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
 import { StatementModal } from "@/components/history/StatementModal";
@@ -29,6 +30,9 @@ export const ActivityLogContainer: React.FC = () => {
 
   // Pagination states for low read operations
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const transactionsRef = useRef<Transaction[]>([]);
+  transactionsRef.current = transactions;
+
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastVisibleDoc, setLastVisibleDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
@@ -151,6 +155,7 @@ export const ActivityLogContainer: React.FC = () => {
     }
   };
 
+
   useEffect(() => {
     fetchInitialTransactions();
 
@@ -186,6 +191,155 @@ export const ActivityLogContainer: React.FC = () => {
 
     fetchMonthlyTotal();
 
+    // Attach real-time listeners for initial batch AND active pending transactions across all pagination pages
+    let unsubscribeMain: (() => void) | null = null;
+    let unsubscribePending: (() => void) | null = null;
+    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+
+    if (!isMock && user) {
+      try {
+        const qMain = query(
+          collection(db, "transactions"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(15)
+        );
+
+        // 1. Primary listener for top 15 recent transactions
+        unsubscribeMain = onSnapshot(
+          qMain,
+          (snap) => {
+            const snapshotList: Transaction[] = [];
+            snap.forEach((docSnap) => {
+              snapshotList.push(parseTransactionDoc(docSnap));
+            });
+
+            setTransactions((prev) => {
+              const txMap = new Map<string, Transaction>();
+
+              snapshotList.forEach((tx) => {
+                txMap.set(tx.id, tx);
+              });
+
+              prev.forEach((tx) => {
+                if (!txMap.has(tx.id)) {
+                  txMap.set(tx.id, tx);
+                }
+              });
+
+              const merged = Array.from(txMap.values()).sort((a, b) => {
+                const tA = new Date(a.createdAt || 0).getTime();
+                const tB = new Date(b.createdAt || 0).getTime();
+                return tB - tA;
+              });
+
+              if (typeof window !== "undefined") {
+                try {
+                  sessionStorage.setItem(
+                    `history_transactions_cache_${user.uid}`,
+                    JSON.stringify({ data: merged.slice(0, 15), hasMore: snap.docs.length >= 15, timestamp: Date.now() })
+                  );
+                } catch {
+                  // Ignore storage write error
+                }
+              }
+
+              return merged;
+            });
+
+            setSelectedTx((currentSelected) => {
+              if (!currentSelected) return null;
+              const updated = snapshotList.find((t) => t.id === currentSelected.id || t.reference === currentSelected.reference);
+              if (updated && (updated.status !== currentSelected.status || updated.totalCredited !== currentSelected.totalCredited)) {
+                return updated;
+              }
+              return currentSelected;
+            });
+
+            if (snap.docs.length > 0) {
+              setLastVisibleDoc(snap.docs[snap.docs.length - 1]);
+            }
+            setHasMore(snap.docs.length >= 15);
+            setLoading(false);
+          },
+          (error) => {
+            console.warn("[ActivityLogContainer onSnapshot Main Warning]:", error?.message || error);
+          }
+        );
+
+        // 2. Targeted listener for all pending transactions belonging to user (monitors older pages seamlessly)
+        const qPending = query(
+          collection(db, "transactions"),
+          where("userId", "==", user.uid),
+          where("status", "in", ["PENDING", "pending", "PROCESSING", "processing"])
+        );
+
+        unsubscribePending = onSnapshot(
+          qPending,
+          async (pendingSnap) => {
+            const pendingDocsList: DocumentData[] = [];
+            pendingSnap.forEach((docSnap) => pendingDocsList.push(docSnap));
+
+            const docChangesList = pendingSnap.docChanges().map((c) => ({
+              type: c.type,
+              doc: c.doc,
+            }));
+
+            const { updatedPendingMap, removedDocIds, removedTxMap } =
+              await processPendingDocChanges(pendingDocsList, docChangesList, (ref) => getDoc(ref));
+
+            const currentTransactions = transactionsRef.current;
+            const { hasChange, updatedList } = applyPendingTransactionsUpdate(
+              currentTransactions,
+              updatedPendingMap,
+              removedDocIds,
+              removedTxMap
+            );
+
+            if (hasChange) {
+              setTransactions(updatedList);
+              fetchMonthlyTotal();
+
+              setSelectedTx((currentSelected) => {
+                if (!currentSelected) return null;
+                const matchInUpdated = updatedList.find(
+                  (t) => t.id === currentSelected.id || t.reference === currentSelected.reference
+                );
+                if (
+                  matchInUpdated &&
+                  (matchInUpdated.status !== currentSelected.status ||
+                    matchInUpdated.totalCredited !== currentSelected.totalCredited)
+                ) {
+                  return matchInUpdated;
+                }
+                return currentSelected;
+              });
+
+              if (typeof window !== "undefined") {
+                try {
+                  sessionStorage.setItem(
+                    `history_transactions_cache_${user.uid}`,
+                    JSON.stringify({
+                      data: updatedList.slice(0, 15),
+                      hasMore: hasMore,
+                      timestamp: Date.now(),
+                    })
+                  );
+                } catch {
+                  // Ignore cache error
+                }
+              }
+            }
+          },
+          (pError) => {
+            console.warn("[ActivityLogContainer Pending Listener Warning]:", pError?.message || pError);
+          }
+        );
+      } catch (err: any) {
+        console.warn("[ActivityLogContainer Setup Listeners Exception]:", err?.message || err);
+      }
+    }
+
     const handleAppRefresh = () => {
       fetchInitialTransactions(true);
       fetchMonthlyTotal();
@@ -194,6 +348,8 @@ export const ActivityLogContainer: React.FC = () => {
     window.addEventListener("app-refresh", handleAppRefresh);
     return () => {
       window.removeEventListener("app-refresh", handleAppRefresh);
+      if (unsubscribeMain) unsubscribeMain();
+      if (unsubscribePending) unsubscribePending();
     };
   }, [user]);
 

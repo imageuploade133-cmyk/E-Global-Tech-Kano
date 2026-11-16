@@ -1,14 +1,15 @@
 import { safeParseJson } from "@/lib/utils";
 import { resolveUssdCode } from "@/lib/ussd-resolver";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const FLW_BASE_URL = "https://etechglobalhub.duckdns.org/api/flutterwave";
+const getFlwBaseUrl = () => `${getGatewayUrl()}/api/flutterwave`;
 
 export interface USSDPaymentPayload { tx_ref: string; amount: number; email: string; phone_number: string; fullname: string; bank_code: string; bank_name?: string; }
 export interface BankTransferPayload { tx_ref: string; amount: number; email: string; phone_number: string; fullname: string; firstname?: string; lastname?: string; narration?: string; }
 
 export class PaymentService {
   static async createUSSDPayment(payload: USSDPaymentPayload, idToken: string, sessionId: string) {
-    const response = await fetch(`${FLW_BASE_URL}/charges?type=ussd`, { method: "POST", headers: { "Authorization": `Bearer ${idToken}`, "Content-Type": "application/json", ...(sessionId ? { "X-Session-ID": sessionId } : {}), ...(sessionId ? { "X-Session-ID": sessionId } : {}), ...(sessionId ? { "X-Session-ID": sessionId } : {}) }, body: JSON.stringify({ tx_ref: payload.tx_ref, amount: payload.amount.toString(), currency: "NGN", email: payload.email, phone_number: payload.phone_number, fullname: payload.fullname, type: "ussd", country: "NG", account_bank: payload.bank_code }) });
+    const response = await fetch(`${getFlwBaseUrl()}/charges?type=ussd`, { method: "POST", headers: { "Authorization": `Bearer ${idToken}`, "Content-Type": "application/json", ...(sessionId ? { "X-Session-ID": sessionId } : {}) }, body: JSON.stringify({ tx_ref: payload.tx_ref, amount: payload.amount.toString(), currency: "NGN", email: payload.email, phone_number: payload.phone_number, fullname: payload.fullname, type: "ussd", country: "NG", account_bank: payload.bank_code }) });
     const resData = await safeParseJson(response);
     console.log(`[VM Payment Gateway USSD Charge API] HTTP Status: ${response.status}`);
     console.log(`[VM Payment Gateway USSD Charge API] Raw Response: ${JSON.stringify(resData)}`);
@@ -29,7 +30,7 @@ export class PaymentService {
       throw new Error("Missing session ID. Please refresh your session and try again.");
     }
 
-    const response = await fetch(`${FLW_BASE_URL}/charges?type=bank_transfer`, { method: "POST", headers: { "Authorization": `Bearer ${idToken}`, "Content-Type": "application/json", "X-Session-ID": normalizedSessionId }, body: JSON.stringify({ tx_ref: payload.tx_ref, amount: payload.amount.toString(), currency: "NGN", email: payload.email, phone_number: payload.phone_number, fullname: payload.fullname, firstname: calculatedFirstname, lastname: calculatedLastname, narration: payload.narration || "E-Tech Wallet Funding", type: "bank_transfer", is_permanent: false }) });
+    const response = await fetch(`${getFlwBaseUrl()}/charges?type=bank_transfer`, { method: "POST", headers: { "Authorization": `Bearer ${idToken}`, "Content-Type": "application/json", "X-Session-ID": normalizedSessionId }, body: JSON.stringify({ tx_ref: payload.tx_ref, amount: payload.amount.toString(), currency: "NGN", email: payload.email, phone_number: payload.phone_number, fullname: payload.fullname, firstname: calculatedFirstname, lastname: calculatedLastname, narration: payload.narration || "E-Tech Wallet Funding", type: "bank_transfer", is_permanent: false }) });
     const resData = await safeParseJson(response);
     console.log(`[VM Payment Gateway Bank Transfer Charge API] HTTP Status: ${response.status}`);
     console.log(`[VM Payment Gateway Bank Transfer Charge API] Raw Response: ${JSON.stringify(resData)}`);

@@ -8,13 +8,14 @@ import { calculateTransferMarkupFee, TransferTieredMarkup } from "@/lib/transfer
 import { getGlobalMinTransferAmount } from "@/lib/global-limits-util";
 import { resolveInternalUserByAccount } from "@/lib/user-resolver";
 import bcrypt from "bcryptjs";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
   let uid = "";
   let requestBody: Record<string, unknown> | null = null;
   let transferProfitMargin = 0;
-  const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+  const gatewayUrl = getGatewayUrl();
 
   console.log("STEP 1 - Request received");
 
@@ -97,9 +98,25 @@ export async function POST(req: Request) {
 
     const isMock = uid === "mock-uid";
 
-    // 2. Fetch base provider transfer fee dynamically from gateway VM or fallback to 10.00 NGN
-    let providerFee = 10.00;
-    if (!isMock) {
+    // 2. Fetch global TRN fee configuration (ON/OFF switch and free transfers quota)
+    let enableTransferFee = true;
+    let freeTransfersQuota = 0;
+    let freeTransferResetPeriod = "NEVER";
+
+    const trnFeeRef = adminDb.collection("config").doc("trn_fee_config");
+    const trnFeeSnap = await trnFeeRef.get();
+    if (trnFeeSnap.exists) {
+      const feeData = trnFeeSnap.data() || {};
+      enableTransferFee = feeData.enableTransferFee !== false;
+      freeTransfersQuota = Math.max(0, Number(feeData.freeTransfersQuota) || 0);
+      freeTransferResetPeriod = feeData.freeTransferResetPeriod || "NEVER";
+    }
+
+    let isFreeTransfer = !enableTransferFee;
+
+    // Fetch base provider transfer fee dynamically if fees enabled
+    let providerFee = enableTransferFee ? 10.00 : 0.00;
+    if (enableTransferFee && !isMock) {
       try {
         const feeRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer-fee?amount=${trfAmount}&currency=${trfCurrency}`, {
           headers: {
@@ -110,15 +127,19 @@ export async function POST(req: Request) {
         });
         const feeData = await feeRes.json();
         if (feeRes.ok && feeData.success) {
-          // Explicitly extract raw provider fee if provided, or use fee property
-          providerFee = Number(feeData.providerFee ?? feeData.fee) || 10.00;
+          if (feeData.isFreeTransfer) {
+            isFreeTransfer = true;
+            providerFee = 0;
+          } else {
+            providerFee = Number(feeData.providerFee ?? feeData.fee) || 10.00;
+          }
         }
       } catch (err: unknown) {
         const error = err as Error;
         console.warn("[Transfer API] Failed to fetch dynamic provider fee. Using fallback 10 NGN:", error.message);
       }
     }
-    console.log(`STEP 3 - Base provider fee fetched: ${providerFee}`);
+    console.log(`STEP 3 - Base provider fee fetched: ${providerFee}, isFreeTransfer: ${isFreeTransfer}`);
 
     const userNarration = narration && narration.trim() ? narration.trim() : null;
     const description = userNarration || `Transfer To ${trfName}`;
@@ -255,16 +276,53 @@ export async function POST(req: Request) {
       // PIN matches, reset attempts (WRITE operation starts here)
       transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
 
-      const combinedFee = providerFee + transferProfitMargin;
+      // Check user free transfer quota
+      let userUsedFreeCount = Number(userData.usedFreeTransfers) || 0;
+      let userLastReset = userData.lastFreeTransferResetDate ? new Date(userData.lastFreeTransferResetDate) : null;
+      const now = new Date();
+
+      if (enableTransferFee && freeTransfersQuota > 0) {
+        let shouldReset = false;
+        if (userLastReset) {
+          if (freeTransferResetPeriod === "DAILY") {
+            shouldReset = userLastReset.toDateString() !== now.toDateString();
+          } else if (freeTransferResetPeriod === "WEEKLY") {
+            const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+            shouldReset = now.getTime() - userLastReset.getTime() >= oneWeekMs;
+          } else if (freeTransferResetPeriod === "MONTHLY") {
+            shouldReset = userLastReset.getMonth() !== now.getMonth() || userLastReset.getFullYear() !== now.getFullYear();
+          }
+        }
+
+        if (shouldReset) {
+          userUsedFreeCount = 0;
+        }
+
+        if (userUsedFreeCount < freeTransfersQuota) {
+          isFreeTransfer = true;
+        }
+      }
+
+      const effectiveFee = isFreeTransfer ? 0 : providerFee;
+      const effectiveMarkup = isFreeTransfer ? 0 : transferProfitMargin;
+      const combinedFee = effectiveFee + effectiveMarkup;
       const finalTotalDeduction = trfAmount + combinedFee;
 
       // Check balance using the pre-loaded specific wallet balance
-      console.log(`STEP 7 - Balance checked. Available wallet: ${walletBalance}, Required: ${finalTotalDeduction}`);
+      console.log(`STEP 7 - Balance checked. Available wallet: ${walletBalance}, Required: ${finalTotalDeduction}, Fee: ${combinedFee}`);
       if (walletBalance < finalTotalDeduction) {
         return {
           success: false,
           error: `Insufficient wallet balance to complete this transfer. Required: ₦${finalTotalDeduction.toLocaleString()}, Available: ₦${walletBalance.toLocaleString()}`,
         };
+      }
+
+      // If user used a free transfer quota, increment counter and update timestamp
+      if (enableTransferFee && freeTransfersQuota > 0 && isFreeTransfer && userUsedFreeCount < freeTransfersQuota) {
+        transaction.update(userRef, {
+          usedFreeTransfers: userUsedFreeCount + 1,
+          lastFreeTransferResetDate: now.toISOString(),
+        });
       }
 
       // Perform local debit atomically
@@ -282,7 +340,7 @@ export async function POST(req: Request) {
         recipientName: trfName,
         fee: combinedFee,
         vat: 0,
-        markup: transferProfitMargin,
+        markup: effectiveMarkup,
         totalDebited: finalTotalDeduction,
         beneficiaryName: trfName,
         beneficiaryAccountNumber: trfAccount,
@@ -409,7 +467,16 @@ export async function POST(req: Request) {
       });
 
       console.log("STEP 12 - Payment Gateway responded");
-      const gatewayData = await gatewayRes.json();
+      const gatewayText = await gatewayRes.text().catch(() => "");
+      let gatewayData: Record<string, any> = {};
+      try {
+        gatewayData = gatewayText ? JSON.parse(gatewayText) : {};
+      } catch {
+        if (gatewayText.includes("Cannot POST") || gatewayText.includes("<!DOCTYPE") || gatewayRes.status === 404) {
+          throw new Error("Payment Gateway service is temporarily unreachable or returned an invalid response.");
+        }
+        throw new Error(gatewayText || "Payment Gateway returned non-JSON response.");
+      }
 
       if (gatewayRes.ok && gatewayData.success) {
         logPaymentEvent({
@@ -424,14 +491,16 @@ export async function POST(req: Request) {
 
         // Update transaction record with provider reference and re-affirm customer fee & markup
         const provRef = gatewayData.provider_reference || gatewayData.data?.id || gatewayData.data?.reference;
-        const combinedFee = providerFee + transferProfitMargin;
+        const effectiveFee = isFreeTransfer ? 0 : providerFee;
+        const effectiveMarkup = isFreeTransfer ? 0 : transferProfitMargin;
+        const combinedFee = effectiveFee + effectiveMarkup;
         const finalTotalDeduction = trfAmount + combinedFee;
 
         try {
           const updatePayload: Record<string, any> = {
             fee: combinedFee,
             transferFee: combinedFee,
-            markup: transferProfitMargin,
+            markup: effectiveMarkup,
             totalDebited: finalTotalDeduction,
             status: "SUCCESS"
           };
@@ -591,6 +660,18 @@ export async function POST(req: Request) {
           const origMarkup = Number(origData.markup) || transferProfitMargin;
 
           refundAmountForNotification = exactRefundAmount;
+
+          // If the transfer was free (origFee === 0), restore the user's usedFreeTransfers quota count
+          const isWasFreeTransfer = origData.fee === 0 || origData.isFreeTransfer === true || isFreeTransfer;
+          if (isWasFreeTransfer) {
+            const currentUsedFree = Number(uData.usedFreeTransfers) || 0;
+            if (currentUsedFree > 0) {
+              rollbackTx.update(userRef, {
+                usedFreeTransfers: currentUsedFree - 1
+              });
+              console.log(`[Transfer Rollback] Restored free transfer quota for user ${uid}. Decremented usedFreeTransfers from ${currentUsedFree} to ${currentUsedFree - 1}`);
+            }
+          }
 
           await WalletService.creditWallet(rollbackTx, {
             userId: uid,

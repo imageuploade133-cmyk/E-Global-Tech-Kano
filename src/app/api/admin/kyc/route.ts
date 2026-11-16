@@ -3,8 +3,9 @@ import { mintFirebaseIdToken } from "@/lib/admin-auth";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+const GATEWAY_URL = getGatewayUrl();
 
 async function autoReleaseUserHeldDeposits(userId: string, adminEmail: string) {
   try {
@@ -235,6 +236,9 @@ export async function GET(req: Request) {
         livenessChallenge: data.livenessChallenge || null,
         kycVerifiedAt: data.kycVerifiedAt || null,
         photoURL: data.photoURL || data.avatarUrl || data.profileImage || data.photoUrl || null,
+        idCardUrl: data.idCardUrl || data.idDocumentUrl || data.kycIdCardUrl || data.documentUrl || null,
+        utilityBillUrl: data.utilityBillUrl || data.proofOfAddressUrl || data.kycUtilityBillUrl || null,
+        proofOfAddressUrl: data.proofOfAddressUrl || data.utilityBillUrl || null,
         virtualAccountNumber: data.virtualAccountNumber || data.accountNumber || "",
         virtualAccountBankName: data.virtualAccountBankName || data.bankName || "",
         balance: Number(data.balance) || 0

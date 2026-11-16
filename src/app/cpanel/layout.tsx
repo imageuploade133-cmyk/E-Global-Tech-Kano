@@ -403,6 +403,8 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
         { id: "kyc", label: "KYC Approvals", icon: "verified_user", href: "/cpanel/kyc", badge: sidebarCounts["kyc"], permission: "kyc.view" },
         { id: "limit_requests", label: "Limit Requests", icon: "manage_accounts", href: "/cpanel/limit-requests", badge: sidebarCounts["limit_requests"], permission: "users.manage" },
         { id: "freeze", label: "Account Freeze", icon: "ac_unit", href: "/cpanel/freeze", permission: "freeze.manage" },
+        { id: "delete_account", label: "Delete Account", icon: "delete_forever", href: "/cpanel/delete-account", badge: sidebarCounts["delete_account"], permission: "users.manage" },
+        { id: "trn_issues", label: "TRN Issues", icon: "report_problem", href: "/cpanel/trn-issues", badge: sidebarCounts["trn_issues"], permission: "users.view" },
         { id: "tier_levels", label: "Assign Tier Levels", icon: "workspace_premium", href: "/cpanel/tier-levels", permission: "limits.manage" },
         { id: "set_limits", label: "Set Limits", icon: "tune", href: "/cpanel/set-limits", permission: "limits.manage" },
         { id: "limits", label: "Global Transfer Limits", icon: "trending_up", href: "/cpanel/limits", permission: "limits.manage" },
@@ -428,6 +430,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
       title: "Financials & Markups",
       items: [
         { id: "deposit", label: "Deposit Fund", icon: "add_card", href: "/cpanel/deposit", permission: "wallets.manage" },
+        { id: "trn_fee", label: "TRN Fee Config", icon: "price_change", href: "/cpanel/trn-fee", permission: "wallets.manage" },
         { id: "inflow_deductions", label: "Auto Inflow Fees", icon: "price_change", href: "/cpanel/inflow-deductions", permission: "wallets.manage" },
         { id: "held_deposits", label: "Blocked & Held", icon: "lock_clock", href: "/cpanel/held-deposits", badge: sidebarCounts["held_deposits"], permission: "wallets.manage" },
         { id: "deductions", label: "Global Wallet Deductions", icon: "payments", href: "/cpanel/deductions", permission: "wallet.deductions.manage" },

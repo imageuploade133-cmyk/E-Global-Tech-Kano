@@ -104,13 +104,32 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const deductionId = searchParams.get("deductionId");
 
-    // If specific deduction ID requested, return user-level deduction audit records
+    // If specific deduction ID requested, return paginated per-user audit records with cursor indexing
     if (deductionId) {
-      const userDeductionsSnap = await adminDb
+      const userPage = Math.max(1, parseInt(searchParams.get("page") || "1"));
+      const userLimit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+
+      // Fetch user records using indexed queries
+      const countSnap = await adminDb
         .collection("user_deductions")
         .where("deductionId", "==", deductionId)
-        .limit(100)
         .get();
+
+      const totalUserRecords = countSnap.size;
+      const totalUserPages = Math.ceil(totalUserRecords / userLimit) || 1;
+
+      let query = adminDb
+        .collection("user_deductions")
+        .where("deductionId", "==", deductionId)
+        .orderBy("createdAt", "desc")
+        .limit(userLimit);
+
+      // Support index pagination with offset/limit
+      if (userPage > 1) {
+        query = query.offset((userPage - 1) * userLimit);
+      }
+
+      const userDeductionsSnap = await query.get();
 
       const userRecords: any[] = [];
       userDeductionsSnap.forEach((doc) => {
@@ -120,6 +139,14 @@ export async function GET(req: Request) {
       return NextResponse.json({
         success: true,
         userRecords,
+        pagination: {
+          page: userPage,
+          limit: userLimit,
+          totalRecords: totalUserRecords,
+          totalPages: totalUserPages,
+          hasNextPage: userPage < totalUserPages,
+          hasPrevPage: userPage > 1,
+        }
       });
     }
 

@@ -204,30 +204,127 @@ export async function GET(req: Request) {
 
     const counts = await countsPromise;
 
-    let mappedVirtualAccounts = rawUsers.map((u) => {
-      const userUid = u.uid || u.id;
-      const acctNum = u.virtualAccountNumber || u.accountNumber || "";
-      const bankName = u.virtualAccountBankName || u.bankName || "Wema Bank";
-      const acctName = u.virtualAccountName || u.accountName || u.name || u.displayName || "";
-      const isActive = u.virtualAccountActive !== false && u.virtualAccountStatus !== "INACTIVE";
+    // Resolve secondary virtual account sources in wallet_accounts & wallets collections
+    const mappedVirtualAccounts = await Promise.all(
+      rawUsers.map(async (u) => {
+        const userUid = u.uid || u.id;
 
-      return {
-        uid: userUid,
-        name: u.name || u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim() || "Customer",
-        email: u.email || "",
-        phoneNumber: u.phoneNumber || u.phone || "",
-        virtualAccountNumber: acctNum,
-        virtualAccountBankName: bankName,
-        virtualAccountName: acctName,
-        virtualAccountProvider: u.virtualAccountProvider || "flutterwave",
-        isActive,
-        deactivatedAt: u.virtualAccountDeactivatedAt || null,
-        deactivatedBy: u.virtualAccountDeactivatedBy || null,
-        kycStatus: u.kycStatus || "UNVERIFIED",
-        balance: Number(u.balance) || 0,
-        createdAt: u.createdAt || new Date().toISOString(),
-      };
-    });
+        // Check primary user properties
+        let acctNum =
+          u.virtualAccountNumber ||
+          u.accountNumber ||
+          u.virtualAccount?.accountNumber ||
+          u.virtualAccount?.virtualAccountNumber ||
+          u.flwAccountNumber ||
+          u.squadAccountNumber ||
+          u.gtbAccountNumber ||
+          u.wemaAccountNumber ||
+          u.monnifyAccountNumber ||
+          u.bankAccount?.accountNumber ||
+          u.bankDetails?.accountNumber ||
+          "";
+
+        let bankName =
+          u.virtualAccountBankName ||
+          u.bankName ||
+          u.virtualAccount?.bankName ||
+          u.virtualAccount?.virtualAccountBankName ||
+          "";
+
+        let acctName =
+          u.virtualAccountName ||
+          u.accountName ||
+          u.virtualAccount?.accountName ||
+          u.displayName ||
+          u.name ||
+          "";
+
+        let provider =
+          u.virtualAccountProvider ||
+          u.provider ||
+          u.virtualAccount?.provider ||
+          "flutterwave";
+
+        let isActive =
+          u.virtualAccountActive !== false &&
+          u.virtualAccountStatus !== "INACTIVE";
+
+        // Fallback 1: Lookup wallet_accounts/{userId} if account number is missing
+        if (!acctNum && userUid) {
+          try {
+            const walletAccountDoc = await adminDb
+              .collection("wallet_accounts")
+              .doc(userUid)
+              .get();
+
+            if (walletAccountDoc.exists) {
+              const waData = walletAccountDoc.data() || {};
+              acctNum = waData.accountNumber || waData.virtualAccountNumber || acctNum;
+              bankName = bankName || waData.bankName || waData.virtualAccountBankName || "";
+              acctName = acctName || waData.accountName || waData.virtualAccountName || "";
+              provider = provider || waData.provider || waData.virtualAccountProvider || "flutterwave";
+              if (waData.status) {
+                isActive = waData.status.toLowerCase() === "active";
+              }
+            }
+          } catch (e) {
+            // Ignore sub-collection lookup error
+          }
+        }
+
+        // Fallback 2: Lookup wallets/{userId}_NGN if account number is still missing
+        if (!acctNum && userUid) {
+          try {
+            const walletDoc = await adminDb
+              .collection("wallets")
+              .doc(`${userUid}_NGN`)
+              .get();
+
+            if (walletDoc.exists) {
+              const wData = walletDoc.data() || {};
+              acctNum = wData.virtualAccountNumber || wData.accountNumber || acctNum;
+              bankName = bankName || wData.virtualAccountBankName || wData.bankName || "";
+              acctName = acctName || wData.virtualAccountName || wData.accountName || "";
+              provider = provider || wData.virtualAccountProvider || wData.provider || "flutterwave";
+              if (wData.virtualAccountActive !== undefined) {
+                isActive = wData.virtualAccountActive !== false;
+              }
+            }
+          } catch (e) {
+            // Ignore wallet doc lookup error
+          }
+        }
+
+        // Default fallback for bankName if account exists
+        if (acctNum && !bankName) {
+          const provLower = provider.toLowerCase();
+          if (provLower === "squad" || provLower === "squadco") {
+            bankName = "GTBank (Squadco)";
+          } else if (provLower === "paystack") {
+            bankName = "Wema Bank / Paystack";
+          } else {
+            bankName = "Wema Bank";
+          }
+        }
+
+        return {
+          uid: userUid,
+          name: u.name || u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim() || "Customer",
+          email: u.email || "",
+          phoneNumber: u.phoneNumber || u.phone || "",
+          virtualAccountNumber: acctNum,
+          virtualAccountBankName: bankName,
+          virtualAccountName: acctName,
+          virtualAccountProvider: provider,
+          isActive,
+          deactivatedAt: u.virtualAccountDeactivatedAt || null,
+          deactivatedBy: u.virtualAccountDeactivatedBy || null,
+          kycStatus: u.kycStatus || "UNVERIFIED",
+          balance: Number(u.balance) || 0,
+          createdAt: u.createdAt || new Date().toISOString(),
+        };
+      })
+    );
 
     // In-memory status filter for search results or default statusFilter if not natively indexed
     if (statusFilter === "ACTIVE") {

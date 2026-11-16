@@ -357,9 +357,13 @@ export default function PinPage() {
         },
         body: JSON.stringify({ otpCode: code, channel })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error || "Incorrect OTP code.");
+        let errStr = typeof data?.error === "string" ? data.error : "Failed to verify OTP code.";
+        if (errStr.includes("<!DOCTYPE") || errStr.includes("Cannot POST") || errStr.includes("html")) {
+          errStr = "WhatsApp OTP verification service is currently unavailable.";
+        }
+        toast.error(errStr);
       } else {
         toast.success(data.message || (resetOption === "email" ? "Email verified successfully!" : "WhatsApp number verified successfully!"));
         setResetStage(3); // Go to Set New PIN stage
@@ -496,15 +500,18 @@ export default function PinPage() {
         },
         body: JSON.stringify({ channel })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        let errStr = data.error || `Failed to send ${resetOption === "email" ? "Email" : "WhatsApp"} OTP.`;
+        let errStr = typeof data?.error === "string" ? data.error : `Failed to send ${resetOption === "email" ? "Email" : "WhatsApp"} OTP.`;
         if (
+          errStr.includes("<!DOCTYPE") ||
+          errStr.includes("Cannot POST") ||
+          errStr.includes("html") ||
           errStr.includes("WhatsApp instance") ||
           errStr.includes("not active or connected") ||
           errStr.includes("WhatsApp Dispatch Failed")
         ) {
-          errStr = "WhatsApp OTP is not available at this time.";
+          errStr = "WhatsApp OTP service is currently unavailable. Please use the Email OTP option instead.";
         }
         toast.error(errStr);
       } else {

@@ -4,8 +4,9 @@ import { CardItem, CardTransaction, BillingAddress } from "@/types/cards";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { safeParseJson } from "@/lib/utils";
 import { randomUUID } from "crypto";
+import { getGatewayUrl } from "@/lib/gateway-util";
 
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+const GATEWAY_URL = getGatewayUrl();
 
 export class CardService {
   /**

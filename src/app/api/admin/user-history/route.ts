@@ -37,20 +37,52 @@ export async function GET(req: Request) {
         {
           id: "mock-tx-1",
           amount: 25000,
+          fee: 10,
+          vat: 0,
+          markup: 0,
+          totalDebited: 25010,
           type: "TRANSFER",
           status: "SUCCESSFUL",
           description: "Transfer to Opay account STEVE",
+          narration: "Vendor payment for hardware",
           createdAt: new Date(Date.now() - 3600000).toISOString(),
-          reference: "tx-opay-123"
+          reference: "tx-opay-123",
+          transferTo: {
+            bankName: "OPAY",
+            bankCode: "999992",
+            accountNumber: "8011223344",
+            accountName: "STEVE OPA"
+          },
+          transferFrom: {
+            senderName: "JULES VERNE",
+            bankName: "E-Global Pay",
+            accountNumber: "0123456789"
+          }
         },
         {
           id: "mock-tx-2",
           amount: 50000,
+          fee: 0,
+          vat: 0,
+          markup: 0,
+          totalCredited: 50000,
           type: "DEPOSIT",
           status: "SUCCESSFUL",
           description: "Flutterwave Wallet Funding",
+          narration: "Virtual account deposit from GTBank",
           createdAt: new Date(Date.now() - 86400000).toISOString(),
-          reference: "tx-flw-fund-456"
+          reference: "tx-flw-fund-456",
+          transferTo: {
+            bankName: "E-Global Pay Wallet",
+            bankCode: "000000",
+            accountNumber: "0123456789",
+            accountName: "JULES VERNE"
+          },
+          transferFrom: {
+            senderName: "ALHAJI BABA",
+            bankName: "GTBank",
+            accountNumber: "0112233445"
+          }
         }
       ];
 
@@ -158,14 +190,40 @@ export async function GET(req: Request) {
     const transactions: any[] = [];
     txSnapshot.forEach((doc) => {
       const data = doc.data();
+
+      // Extract Destination (Transfer To) details
+      const transferTo = {
+        bankName: data.recipientBankName || data.beneficiaryBankName || data.recipientBank || data.bankName || (data.type === "TRANSFER" ? "Destination Bank" : "E-Global Pay Wallet"),
+        bankCode: data.beneficiaryBankCode || data.bankCode || null,
+        accountNumber: data.recipientAccountNumber || data.beneficiaryAccountNumber || data.accountNumber || "N/A",
+        accountName: data.recipientName || data.beneficiaryName || data.accountName || data.recipient || "N/A"
+      };
+
+      // Extract Originator (Transfer From) details
+      const transferFrom = {
+        senderName: data.senderName || data.originatorName || data.sender || (data.direction === "DEBIT" || data.type === "TRANSFER" ? sanitizedUser.name : "Incoming Depositor"),
+        bankName: data.senderBankName || data.originatorBankName || data.senderBank || (data.direction === "DEBIT" || data.type === "TRANSFER" ? "E-Global Pay" : "Originating Bank"),
+        accountNumber: data.senderAccountNumber || data.originatorAccountNumber || data.senderAccount || "N/A"
+      };
+
       transactions.push({
         id: doc.id,
         amount: data.amount || 0,
+        fee: data.fee || data.transferFee || 0,
+        vat: data.vat || 0,
+        markup: data.markup || 0,
+        totalDebited: data.totalDebited || (data.amount || 0) + (data.fee || 0),
+        totalCredited: data.totalCredited || data.amount || 0,
         type: data.type || "TRANSACTION",
+        category: data.category || "general",
+        direction: data.direction || (data.type === "DEPOSIT" ? "CREDIT" : "DEBIT"),
         status: data.status || "SUCCESSFUL",
         description: data.description || data.narration || "Wallet Transaction",
+        narration: data.narration || data.remark || null,
         createdAt: data.createdAt || new Date().toISOString(),
-        reference: data.reference || data.tx_ref || doc.id
+        reference: data.reference || data.transactionNumber || data.tx_ref || doc.id,
+        transferTo,
+        transferFrom
       });
     });
 

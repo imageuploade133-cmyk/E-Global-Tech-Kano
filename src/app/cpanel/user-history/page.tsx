@@ -24,14 +24,37 @@ interface UserProfile {
   createdAt: string;
 }
 
+interface TransferTarget {
+  bankName?: string;
+  bankCode?: string | null;
+  accountNumber?: string;
+  accountName?: string;
+}
+
+interface TransferSource {
+  senderName?: string;
+  bankName?: string;
+  accountNumber?: string;
+}
+
 interface TransactionItem {
   id: string;
   amount: number;
+  fee?: number;
+  vat?: number;
+  markup?: number;
+  totalDebited?: number;
+  totalCredited?: number;
   type: string;
+  category?: string;
+  direction?: string;
   status: string;
   description: string;
+  narration?: string | null;
   createdAt: string;
   reference: string;
+  transferTo?: TransferTarget;
+  transferFrom?: TransferSource;
 }
 
 interface InvestmentItem {
@@ -85,7 +108,6 @@ function AdminUserHistoryPageContent() {
   const inputClass = isDark
     ? "bg-[#111827] border border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full"
     : "bg-[#F9FAFB] border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full";
-  const labelClass = isDark ? "text-gray-300" : "text-gray-900";
 
   // Admin lock validation
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
@@ -124,6 +146,18 @@ function AdminUserHistoryPageContent() {
   const [investments, setInvestments] = useState<InvestmentItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(20);
+
+  // Selected Transaction Modal State
+  const [selectedTx, setSelectedTx] = useState<TransactionItem | null>(null);
+
+  const copyToClipboard = (text: string, label: string) => {
+    if (!text || text === "N/A") {
+      toast.error(`No ${label} available to copy.`);
+      return;
+    }
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard!`);
+  };
 
   const fetchUserHistory = async (customLimit?: number) => {
     const limitVal = customLimit || historyLimit;
@@ -209,7 +243,7 @@ function AdminUserHistoryPageContent() {
       } else {
         toast.error(data.error || "Invalid Email or Access PIN!");
       }
-    } catch (err: any) {
+    } catch {
       toast.error("API connection error during verification.");
     } finally {
       setIsVerifyingPin(false);
@@ -464,7 +498,7 @@ function AdminUserHistoryPageContent() {
                 <div className="border-b pb-3.5 flex justify-between items-center">
                   <div>
                     <h4 className="text-xs font-black uppercase text-[#FC7A00] tracking-wider">Transaction History Log</h4>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Full S2S ledger record audits ({transactions.length})</p>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Click any row to inspect complete transfer routing & copy reference details ({transactions.length})</p>
                   </div>
                 </div>
 
@@ -483,6 +517,7 @@ function AdminUserHistoryPageContent() {
                           <th className="pb-3 text-center">Status</th>
                           <th className="pb-3 text-center">Reference ID</th>
                           <th className="pb-3 text-center">Timestamp</th>
+                          <th className="pb-3 text-center">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-150 dark:divide-gray-850">
@@ -490,8 +525,12 @@ function AdminUserHistoryPageContent() {
                           const isCredit = tx.type === "DEPOSIT" || tx.type === "REFUND";
                           const isSuccess = tx.status === "SUCCESSFUL" || tx.status === "SUCCESS";
                           return (
-                            <tr key={tx.id} className="hover:bg-gray-50/40 dark:hover:bg-gray-900/10">
-                              <td className="py-3 pl-2 max-w-[220px] truncate" title={tx.description}>
+                            <tr
+                              key={tx.id}
+                              onClick={() => setSelectedTx(tx)}
+                              className="hover:bg-gray-50/80 dark:hover:bg-gray-900/40 cursor-pointer transition-colors"
+                            >
+                              <td className="py-3 pl-2 max-w-[200px] truncate" title={tx.description}>
                                 <p className="font-extrabold text-xs">{tx.description}</p>
                               </td>
                               <td className={cn(
@@ -515,11 +554,23 @@ function AdminUserHistoryPageContent() {
                                   {tx.status}
                                 </span>
                               </td>
-                              <td className="py-3 text-center font-mono text-[9px] text-gray-500 break-all select-all">
+                              <td className="py-3 text-center font-mono text-[9px] text-gray-500 break-all">
                                 {tx.reference}
                               </td>
                               <td className="py-3 text-center text-gray-400 text-[10px] font-semibold font-mono">
                                 {new Date(tx.createdAt).toLocaleString()}
+                              </td>
+                              <td className="py-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedTx(tx);
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-[#FC7A00]/10 text-[#FC7A00] border border-[#FC7A00]/20 hover:bg-[#FC7A00]/20 transition-all cursor-pointer"
+                                >
+                                  Inspect
+                                </button>
                               </td>
                             </tr>
                           );
@@ -638,6 +689,232 @@ function AdminUserHistoryPageContent() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Transaction Full Details Drawer / Modal */}
+      <AnimatePresence>
+        {selectedTx && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className={cn(
+                "w-full max-w-lg rounded-3xl p-6 border shadow-2xl relative space-y-5 overflow-y-auto max-h-[90vh]",
+                isDark ? "bg-[#111827] border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900"
+              )}
+            >
+              {/* Modal Header */}
+              <div className="flex justify-between items-start border-b pb-4" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
+                <div>
+                  <span className={cn(
+                    "px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border inline-block mb-1",
+                    selectedTx.type === "DEPOSIT" || selectedTx.type === "REFUND"
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : "bg-orange-500/10 text-orange-400 border-orange-500/20"
+                  )}>
+                    {selectedTx.type} ({selectedTx.status})
+                  </span>
+                  <h3 className="font-extrabold text-lg leading-tight">{selectedTx.description}</h3>
+                  <p className="text-[10px] text-gray-400 font-semibold font-mono mt-0.5">
+                    {new Date(selectedTx.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTx(null)}
+                  className={cn(
+                    "w-8 h-8 rounded-full border flex items-center justify-center text-gray-400 transition-colors cursor-pointer",
+                    isDark ? "border-gray-800 hover:bg-gray-800 hover:text-white" : "border-gray-200 hover:bg-gray-100 hover:text-black"
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              {/* Amount Breakdown */}
+              <div className={cn("p-4 rounded-2xl border flex flex-col gap-2", isDark ? "bg-gray-900/60 border-gray-800" : "bg-gray-50 border-gray-200")}>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black uppercase text-gray-400">Principal Amount</span>
+                  <span className="font-mono font-black text-sm">₦{selectedTx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                {selectedTx.fee !== undefined && selectedTx.fee > 0 && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-[10px] font-black uppercase text-gray-400">Transfer Fee</span>
+                    <span className="font-mono text-gray-400">₦{selectedTx.fee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                {selectedTx.totalDebited !== undefined && selectedTx.totalDebited > 0 && (
+                  <div className="flex justify-between items-center pt-2 border-t" style={{ borderColor: isDark ? "#374151" : "#e5e7eb" }}>
+                    <span className="text-[10px] font-black uppercase text-[#FC7A00]">Total Debit Deduction</span>
+                    <span className="font-mono font-black text-base text-[#FC7A00]">₦{selectedTx.totalDebited.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Reference ID Block with Copy Button */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Transaction / Reference ID</label>
+                <div className={cn("flex items-center justify-between p-3 rounded-2xl border font-mono text-xs font-bold", isDark ? "bg-gray-900 border-gray-800 text-orange-400" : "bg-orange-50/50 border-orange-100 text-orange-600")}>
+                  <span className="break-all select-all pr-2">{selectedTx.reference}</span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(selectedTx.reference, "Reference ID")}
+                    className="p-1.5 rounded-lg bg-[#FC7A00] text-white hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer flex-shrink-0"
+                    title="Copy Reference ID"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Transfer To (Recipient Destination) Details */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-[#FC7A00]">
+                  <span className="material-symbols-outlined text-[16px]">south_east</span>
+                  <span>Transfer To (Destination Bank & Beneficiary)</span>
+                </div>
+                <div className={cn("p-4 rounded-2xl border space-y-2.5", isDark ? "bg-gray-900/50 border-gray-800" : "bg-white border-gray-200")}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-[9px] font-black uppercase text-gray-400">Recipient Name</p>
+                      <p className="font-bold text-xs mt-0.5">{selectedTx.transferTo?.accountName || "N/A"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(selectedTx.transferTo?.accountName || "", "Recipient Name")}
+                      className="text-[10px] text-gray-400 hover:text-[#FC7A00] font-black uppercase flex items-center gap-1 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">content_copy</span> Copy
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
+                    <div>
+                      <p className="text-[9px] font-black uppercase text-gray-400">Destination Bank</p>
+                      <div className="flex items-center justify-between pr-2">
+                        <p className="font-extrabold text-xs text-[#FC7A00] mt-0.5">{selectedTx.transferTo?.bankName || "N/A"}</p>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(selectedTx.transferTo?.bankName || "", "Destination Bank")}
+                          className="text-gray-400 hover:text-[#FC7A00] cursor-pointer"
+                          title="Copy Bank Name"
+                        >
+                          <span className="material-symbols-outlined text-[12px]">content_copy</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[9px] font-black uppercase text-gray-400">Account Number</p>
+                      <div className="flex items-center justify-between pr-2">
+                        <p className="font-mono font-extrabold text-xs mt-0.5 select-all">{selectedTx.transferTo?.accountNumber || "N/A"}</p>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(selectedTx.transferTo?.accountNumber || "", "Account Number")}
+                          className="text-gray-400 hover:text-[#FC7A00] cursor-pointer"
+                          title="Copy Account Number"
+                        >
+                          <span className="material-symbols-outlined text-[12px]">content_copy</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transfer From (Sender Originator) Details */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-emerald-500">
+                  <span className="material-symbols-outlined text-[16px]">north_west</span>
+                  <span>Transfer From (Originating Sender & Bank)</span>
+                </div>
+                <div className={cn("p-4 rounded-2xl border space-y-2.5", isDark ? "bg-gray-900/50 border-gray-800" : "bg-white border-gray-200")}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-[9px] font-black uppercase text-gray-400">Sender / Originator Name</p>
+                      <p className="font-bold text-xs mt-0.5">{selectedTx.transferFrom?.senderName || targetUser?.name || "N/A"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(selectedTx.transferFrom?.senderName || targetUser?.name || "", "Sender Name")}
+                      className="text-[10px] text-gray-400 hover:text-emerald-500 font-black uppercase flex items-center gap-1 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">content_copy</span> Copy
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
+                    <div>
+                      <p className="text-[9px] font-black uppercase text-gray-400">Originating Bank</p>
+                      <div className="flex items-center justify-between pr-2">
+                        <p className="font-extrabold text-xs text-emerald-500 mt-0.5">{selectedTx.transferFrom?.bankName || "E-Global Pay"}</p>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(selectedTx.transferFrom?.bankName || "E-Global Pay", "Originating Bank")}
+                          className="text-gray-400 hover:text-emerald-500 cursor-pointer"
+                          title="Copy Originating Bank"
+                        >
+                          <span className="material-symbols-outlined text-[12px]">content_copy</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[9px] font-black uppercase text-gray-400">Sender Account</p>
+                      <div className="flex items-center justify-between pr-2">
+                        <p className="font-mono font-extrabold text-xs mt-0.5 select-all">{selectedTx.transferFrom?.accountNumber || "N/A"}</p>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(selectedTx.transferFrom?.accountNumber || "", "Sender Account")}
+                          className="text-gray-400 hover:text-emerald-500 cursor-pointer"
+                          title="Copy Sender Account"
+                        >
+                          <span className="material-symbols-outlined text-[12px]">content_copy</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Narration if available */}
+              {selectedTx.narration && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase text-gray-400">Narration / Remark</p>
+                  <p className={cn("p-3 rounded-xl border text-xs font-semibold italic", isDark ? "bg-gray-900 border-gray-800 text-gray-300" : "bg-gray-50 border-gray-200 text-gray-700")}>
+                    &ldquo;{selectedTx.narration}&rdquo;
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fullSnippet = `Transaction Reference: ${selectedTx.reference}\nAmount: ₦${selectedTx.amount}\nStatus: ${selectedTx.status}\nTransfer To: ${selectedTx.transferTo?.accountName} (${selectedTx.transferTo?.bankName} - ${selectedTx.transferTo?.accountNumber})\nTransfer From: ${selectedTx.transferFrom?.senderName} (${selectedTx.transferFrom?.bankName} - ${selectedTx.transferFrom?.accountNumber})`;
+                    copyToClipboard(fullSnippet, "Full Transaction Audit Record");
+                  }}
+                  className="flex-1 py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                  <span>Copy Full Audit Record</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTx(null)}
+                  className={cn(
+                    "px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer",
+                    isDark ? "border-gray-700 hover:bg-gray-800 text-gray-300" : "border-gray-200 hover:bg-gray-100 text-gray-700"
+                  )}
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

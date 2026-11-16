@@ -48,6 +48,7 @@ const DEFAULT_SETTINGS = {
   enableProductVideo: true,
   hideCardPayment: false,
   enablePickup: false,
+  productCardImageMode: "cover" as const,
 };
 
 export async function GET(req: Request) {
@@ -295,6 +296,7 @@ export async function POST(req: Request) {
         enableProductVideo: settings.enableProductVideo !== undefined ? Boolean(settings.enableProductVideo) : currentSettings.enableProductVideo,
         hideCardPayment: settings.hideCardPayment !== undefined ? Boolean(settings.hideCardPayment) : currentSettings.hideCardPayment,
         enablePickup: settings.enablePickup !== undefined ? Boolean(settings.enablePickup) : currentSettings.enablePickup,
+        productCardImageMode: settings.productCardImageMode === "contain" ? "contain" : "cover",
       };
     } else {
       return NextResponse.json({ error: "Invalid action specified." }, { status: 400 });

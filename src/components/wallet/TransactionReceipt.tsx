@@ -14,7 +14,9 @@ import { resolveBankName } from "@/lib/bank-resolver";
 import { getTransactionLedgerStatus } from "@/lib/transaction-status-normalizer";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { parseDataPlan } from "@/components/bills/types";
-import { AppLogo } from "@/components/AppLogo";
+import { ShareReceiptModal } from "@/components/wallet/ShareReceiptModal";
+import { InvestmentPinModal } from "@/components/investment/InvestmentPinModal";
+import { ReportTransactionIssueModal, ReportDataPayload } from "@/components/wallet/ReportTransactionIssueModal";
 
 export interface Transaction {
   id: string;
@@ -117,19 +119,18 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   initialShowShareModal = false,
 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
-  const shareReceiptRef = useRef<HTMLDivElement>(null);
-  const [generating, setGenerating] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
-  const [exportStatusText, setExportStatusText] = useState("");
-  const [isExporting, setIsExporting] = useState(false);
   const [showShareModal, setShowShareModal] = useState(initialShowShareModal);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isReportPinModalOpen, setIsReportPinModalOpen] = useState(false);
+  const [pendingReportData, setPendingReportData] = useState<ReportDataPayload | null>(null);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   const { getBillerLogo, getBankLogo, getStoreLogo, banks } = useLogos();
   const { config } = useAppConfig();
   const { userData } = useAuth();
 
-  useModalBackHandler(Boolean(transaction), onClose, "transaction-receipt-modal");
-  useModalBackHandler(showShareModal, () => setShowShareModal(false), "share-receipt-modal");
+  useModalBackHandler(Boolean(transaction) && !isReportModalOpen, onClose, "transaction-receipt-modal");
+  useModalBackHandler(isReportModalOpen, () => setIsReportModalOpen(false), "report-issue-modal");
 
   // Prevent background scrolling while modal is open
   useEffect(() => {
@@ -147,6 +148,58 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(text);
       toast.success(`${label} copied successfully!`);
+    }
+  };
+
+  const handleAuthorizeReportRequest = (data: ReportDataPayload) => {
+    setPendingReportData(data);
+    setIsReportPinModalOpen(true);
+  };
+
+  const handleExecuteReportSubmission = async (pin?: string, isBiometricAuthenticated?: boolean) => {
+    if (!pendingReportData) return;
+
+    setIsSubmittingReport(true);
+    toast.loading("Submitting transaction report...", { id: "trn-report" });
+
+    try {
+      let idToken = "";
+      if (typeof window !== "undefined" && (window as any).firebaseUserToken) {
+        idToken = (window as any).firebaseUserToken;
+      }
+
+      const res = await fetch("/api/transactions/report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({
+          transaction,
+          issueCategory: pendingReportData.issueCategory,
+          customNote: pendingReportData.customNote,
+          screenshotUrl: pendingReportData.screenshotUrl,
+          pin,
+          isBiometricAuthenticated,
+        }),
+      });
+
+      const data = await res.json();
+      toast.dismiss("trn-report");
+
+      if (res.ok && data.success) {
+        toast.success("Your transaction report has been submitted successfully!");
+        setIsReportPinModalOpen(false);
+        setIsReportModalOpen(false);
+        setPendingReportData(null);
+      } else {
+        toast.error(data.error || "Failed to submit report.");
+      }
+    } catch {
+      toast.dismiss("trn-report");
+      toast.error("Network error submitting report.");
+    } finally {
+      setIsSubmittingReport(false);
     }
   };
 
@@ -310,7 +363,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
   const storedTotalDebited = Number(transaction.totalDebited) || 0;
   let combinedTransferFee = rawFee;
-  if (markup > 0) {
+  if (rawFee === 0 && (storedTotalDebited === 0 || storedTotalDebited === transaction.amount)) {
+    combinedTransferFee = 0;
+  } else if (markup > 0) {
     combinedTransferFee = (rawFee > markup && rawFee >= markup + 5) ? rawFee : (rawFee + markup);
   } else if (storedTotalDebited > transaction.amount) {
     combinedTransferFee = Math.max(0, storedTotalDebited - transaction.amount - vat);
@@ -499,12 +554,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
     recipientNameDisplay = transaction.beneficiaryName || transaction.recipientName || "Beneficiary";
     const recBank = resolvedTransferToBank !== "Bank" ? resolvedTransferToBank : (transaction.recipientBankName || "Bank");
-    const recAcc = maskAccountNum(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber);
+    const recAcc = transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber;
     recipientBankAndAcc = recAcc ? `${recBank} | ${recAcc}` : recBank;
 
     senderNameDisplay = userFullName || transaction.senderName || config.appName || "E-Global Pay User";
     const sendBank = config.appName || "E-Global Pay";
-    const sendAcc = maskAccountNum(userData?.virtualAccountNumber || userData?.accountNumber || transaction.senderAccountNumber);
+    const sendAcc = userData?.virtualAccountNumber || userData?.accountNumber || transaction.senderAccountNumber;
     senderBankAndAcc = sendAcc ? `${sendBank} | ${sendAcc}` : sendBank;
   } else if (isBill || isAirtime || isData || isElectricity || isCable || isWaec) {
     txTypeDisplay = isAirtime ? "Airtime Top-up" : isData ? "Data Bundle" : isElectricity ? "Electricity Utility" : isCable ? "Cable TV" : isWaec ? "WAEC Purchase" : "Bill Payment";
@@ -555,301 +610,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
   const displayAmount = (isHeldDeposit ? (Number(transaction.metadata?.heldAmount) || transaction.amount) : isRefund ? (Number(transaction.totalCredited) || (transaction.amount + fee + vat)) : transaction.amount);
   const formattedDateTime = formatTransactionDateTime(transaction.createdAt, transaction.date, transaction.time).dateTime;
-  const statusText = ledgerStatus.label === "Credited" || ledgerStatus.label === "Debited" ? "Successful" : ledgerStatus.label;
-
-  // Canvas Sanitization for html2canvas (converts Tailwind v4 oklab, oklch, lab, lch color functions to safe fallbacks)
-  const sanitizeCssString = (css: string): string => {
-    if (!css) return "";
-    return css
-      .replace(/oklab\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
-      .replace(/oklch\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
-      .replace(/lab\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
-      .replace(/lch\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)")
-      .replace(/color\([^)]+\)/gi, "rgba(0, 0, 0, 0.1)");
-  };
-
-  const onCloneReceiptForHtml2Canvas = (clonedDoc: Document) => {
-    // 1. Retain <link rel="stylesheet"> so Tailwind layout and styles are preserved!
-    // Sanitize all inline <style> blocks
-    const styleElements = clonedDoc.querySelectorAll("style");
-    styleElements.forEach((style) => {
-      try {
-        if (style.innerHTML) {
-          style.innerHTML = sanitizeCssString(style.innerHTML);
-        }
-        if (style.textContent) {
-          style.textContent = sanitizeCssString(style.textContent);
-        }
-      } catch (e) {
-        // Ignore CSS parsing issues
-      }
-    });
-
-    // 2. Sanitize rules in clonedDoc.styleSheets without deleting whole rules or removing stylesheet links
-    try {
-      Array.from(clonedDoc.styleSheets).forEach((sheet) => {
-        try {
-          const rules = Array.from(sheet.cssRules || []);
-          rules.forEach((rule) => {
-            if (rule.cssText && /(oklab|oklch|lab|lch|color)\(/i.test(rule.cssText)) {
-              try {
-                // If it's a style rule, replace unsupported color expressions in its style declaration
-                const styleRule = rule as CSSStyleRule;
-                if (styleRule.style) {
-                  const cssText = styleRule.style.cssText;
-                  if (cssText) {
-                    styleRule.style.cssText = sanitizeCssString(cssText);
-                  }
-                }
-              } catch (err) {}
-            }
-          });
-        } catch (e) {
-          // Cross-origin or restricted stylesheet
-        }
-      });
-    } catch (e) {}
-
-    // 3. Convert computed element styles to explicit inline styles for unsupported color syntax
-    const UNSUPPORTED_PATTERN = /(oklab|oklch|lab|lch|color)\(/i;
-    const clonedElements = clonedDoc.querySelectorAll("*");
-
-    clonedElements.forEach((el) => {
-      const htmlEl = el as HTMLElement;
-
-      if (htmlEl.hasAttribute("style")) {
-        const rawStyle = htmlEl.getAttribute("style");
-        if (rawStyle) {
-          htmlEl.setAttribute("style", sanitizeCssString(rawStyle));
-        }
-      }
-
-      try {
-        const computed = window.getComputedStyle(htmlEl);
-        if (UNSUPPORTED_PATTERN.test(computed.backgroundColor)) {
-          htmlEl.style.backgroundColor = "transparent";
-        }
-        if (UNSUPPORTED_PATTERN.test(computed.color)) {
-          htmlEl.style.color = "#000000";
-        }
-        if (UNSUPPORTED_PATTERN.test(computed.borderColor)) {
-          htmlEl.style.borderColor = "#E2E8F0";
-        }
-      } catch (e) {
-        // Ignore style inspection failures
-      }
-    });
-  };
-
-  const waitForReceiptImages = async (element: HTMLElement, timeoutMs = 5000): Promise<void> => {
-    const images = Array.from(element.querySelectorAll("img"));
-    if (images.length === 0) return;
-
-    const imagePromises = images.map((img) => {
-      if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
-        return Promise.resolve();
-      }
-      return new Promise<void>((resolve) => {
-        let settled = false;
-        const done = () => {
-          if (!settled) {
-            settled = true;
-            resolve();
-          }
-        };
-        if (img.complete) {
-          done();
-        } else {
-          img.onload = done;
-          img.onerror = () => {
-            console.warn("[TransactionReceipt Image Load Warning] Image failed to load:", img.src);
-            done();
-          };
-        }
-      });
-    });
-
-    const timeoutPromise = new Promise<void>((resolve) => {
-      setTimeout(() => {
-        console.warn("[TransactionReceipt Image Load Timeout] Waited for receipt images to load.");
-        resolve();
-      }, timeoutMs);
-    });
-
-    await Promise.race([Promise.all(imagePromises), timeoutPromise]);
-  };
-
-  const handleShareImageFromModal = async () => {
-    if (!shareReceiptRef.current) return;
-    try {
-      setGenerating(true);
-      setIsExporting(true);
-      setExportProgress(10);
-      setExportStatusText("Preloading images...");
-
-      await waitForReceiptImages(shareReceiptRef.current, 5000);
-      setExportProgress(40);
-      setExportStatusText("Sanitizing CSS & compiling canvas...");
-
-      const html2canvas = (await import("html2canvas")).default;
-
-      setExportProgress(65);
-      setExportStatusText("Rendering HD graphic...");
-
-      const canvas = await html2canvas(shareReceiptRef.current, {
-        scale: 3,
-        useCORS: true,
-        backgroundColor: "#FFFFFF",
-        logging: false,
-        onclone: onCloneReceiptForHtml2Canvas,
-      });
-
-      setExportProgress(85);
-      setExportStatusText("Preparing share payload...");
-
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          toast.error("Failed to compile receipt image.");
-          setIsExporting(false);
-          setGenerating(false);
-          return;
-        }
-
-        const file = new File([blob], `Receipt_${transaction.reference}.png`, { type: "image/png" });
-
-        setExportProgress(95);
-        setExportStatusText("Opening share tray...");
-
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: `${config.appName || "E-Global Pay"} Transaction Receipt`,
-            text: `Transaction Receipt - ${transaction.reference}`,
-          });
-        } else {
-          const imageFileName = `Receipt_${transaction.reference}.png`;
-          const imageDataUri = canvas.toDataURL("image/png");
-          const bridge =
-            typeof window !== "undefined"
-              ? (window as any).flutter_inappwebview
-              : null;
-
-          if (bridge && typeof bridge.callHandler === "function") {
-            await bridge.callHandler("downloadBase64File", {
-              data: imageDataUri,
-              fileName: imageFileName,
-              mimeType: "image/png",
-            });
-          } else {
-            const objectUrl = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = objectUrl;
-            link.download = imageFileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-          }
-
-          toast.success("Downloaded HD receipt image.");
-        }
-
-        setExportProgress(100);
-        setTimeout(() => {
-          setIsExporting(false);
-          setGenerating(false);
-        }, 500);
-      }, "image/png", 1.0);
-    } catch (err) {
-      console.error("Share image failed:", err);
-      toast.error("Failed to share image.");
-      setIsExporting(false);
-      setGenerating(false);
-    }
-  };
-
-  const handleSharePdfFromModal = async () => {
-    if (!shareReceiptRef.current) return;
-    try {
-      setGenerating(true);
-      setIsExporting(true);
-      setExportProgress(10);
-      setExportStatusText("Preloading assets...");
-
-      await waitForReceiptImages(shareReceiptRef.current, 5000);
-      setExportProgress(35);
-      setExportStatusText("Sanitizing styles & compiling...");
-
-      const html2canvas = (await import("html2canvas")).default;
-      const { jsPDF } = await import("jspdf");
-
-      setExportProgress(55);
-      setExportStatusText("Rendering HD PDF canvas...");
-
-      const canvas = await html2canvas(shareReceiptRef.current, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#FFFFFF",
-        logging: false,
-        onclone: onCloneReceiptForHtml2Canvas,
-      });
-
-      setExportProgress(80);
-      setExportStatusText("Building PDF document...");
-
-      const imgData = canvas.toDataURL("image/png", 1.0);
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-
-      const imgWidth = 180;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const xPos = (pdfWidth - imgWidth) / 2;
-      const yPos = 15;
-
-      pdf.addImage(imgData, "PNG", xPos, yPos, imgWidth, imgHeight, undefined, "FAST");
-
-      const pdfFileName = `Receipt_${transaction.reference}.pdf`;
-      const pdfDataUri = pdf.output("datauristring");
-      const bridge =
-        typeof window !== "undefined"
-          ? (window as any).flutter_inappwebview
-          : null;
-
-      setExportProgress(95);
-      setExportStatusText("Finalizing PDF...");
-
-      const pdfBlob = pdf.output("blob");
-      const pdfFile = new File([pdfBlob], pdfFileName, { type: "application/pdf" });
-
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-        await navigator.share({
-          files: [pdfFile],
-          title: `${config.appName || "E-Global Pay"} Transaction Receipt`,
-          text: `Transaction Receipt - ${transaction.reference}`,
-        });
-      } else if (bridge && typeof bridge.callHandler === "function") {
-        await bridge.callHandler("downloadBase64File", {
-          data: pdfDataUri,
-          fileName: pdfFileName,
-          mimeType: "application/pdf",
-        });
-      } else {
-        pdf.save(pdfFileName);
-      }
-
-      setExportProgress(100);
-      toast.success("HD PDF Receipt generated successfully!");
-    } catch (err) {
-      console.error("PDF generation failed:", err);
-      toast.error("Failed to generate PDF.");
-    } finally {
-      setTimeout(() => {
-        setIsExporting(false);
-        setGenerating(false);
-      }, 500);
-    }
-  };
 
   return (
     <AnimatePresence>
@@ -872,7 +632,14 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
               Transaction Details
             </h2>
           </div>
-          <div className="w-10" />
+          <button
+            type="button"
+            onClick={() => setIsReportModalOpen(true)}
+            className="w-10 h-10 rounded-full border border-red-200 bg-red-50/80 flex items-center justify-center text-red-600 hover:bg-red-100 active:scale-90 transition-all cursor-pointer shadow-3xs"
+            title="Report Transaction Issue"
+          >
+            <span className="material-symbols-outlined text-[20px] font-bold">flag</span>
+          </button>
         </div>
 
         {/* Scrollable Transaction Specifications Canvas */}
@@ -1192,10 +959,20 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 {isTransfer && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Transfer To</span>
-                      <span className="text-black font-bold uppercase text-right pl-3 break-words max-w-[220px]">
-                        {transaction.beneficiaryName || transaction.recipientName || "Not available"}
-                      </span>
+                      <span>Sender Details</span>
+                      <div className="flex flex-col items-end text-right max-w-[220px]">
+                        <span className="text-black font-bold uppercase">
+                          {userFullName || transaction.senderName || config.appName || "E-Global Pay User"}
+                        </span>
+                        <span className="text-black font-extrabold text-xs tracking-tight mt-0.5">
+                          {config.appName || "E-Global Pay"}
+                        </span>
+                        {(userData?.virtualAccountNumber || userData?.accountNumber || transaction.senderAccountNumber) && (
+                          <span className="font-mono text-gray-600 font-bold text-[11px] mt-0.5">
+                            Account: {userData?.virtualAccountNumber || userData?.accountNumber || transaction.senderAccountNumber}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
@@ -1241,7 +1018,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
                       <span>Transfer Fee</span>
-                      <span className="text-black font-bold">{currencySymbol}{fee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span className="text-black font-bold font-mono">
+                        {fee > 0 ? `${currencySymbol}${fee.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `${currencySymbol}0.00 (Free)`}
+                      </span>
                     </div>
 
                     {vat > 0 && (
@@ -1906,32 +1685,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           </div>
         </div>
 
-        {/* Export Progress Bar Overlay */}
-        <AnimatePresence>
-          {isExporting && (
-            <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className="absolute bottom-20 left-4 right-4 z-20 bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-orange-200/80 shadow-xl space-y-2.5 max-w-sm mx-auto"
-            >
-              <div className="flex items-center justify-between text-xs font-black text-[#FC7A00]">
-                <span className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
-                  <span>{exportStatusText || "Exporting Receipt..."}</span>
-                </span>
-                <span className="font-mono font-black text-xs text-gray-800">{exportProgress}%</span>
-              </div>
-              <div className="w-full bg-orange-100 h-2.5 rounded-full overflow-hidden p-0.5">
-                <div
-                  className="bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] h-full rounded-full transition-all duration-300 shadow-2xs"
-                  style={{ width: `${Math.max(5, Math.min(exportProgress, 100))}%` }}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Single Bottom Action Button: Share Receipt */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 shadow-lg z-10">
           <button
@@ -1944,155 +1697,41 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           </button>
         </div>
 
-        {/* Full-Screen "Share Receipt" High-Fidelity Ticket Modal */}
-        <AnimatePresence>
-          {showShareModal && (
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 30 }}
-              className="fixed inset-0 w-full h-full bg-[#F5F6F8] z-[100005] flex flex-col select-none overflow-hidden text-black"
-            >
-              {/* Modal Top Navigation */}
-              <div className="safe-top bg-[#F5F6F8] px-5 py-4 flex items-center justify-between shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowShareModal(false)}
-                  className="flex items-center gap-2 text-gray-800 font-semibold text-base active:scale-95 transition-all cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-2xl font-bold">arrow_back</span>
-                  <span>Share Receipt</span>
-                </button>
-                <div className="w-8" />
-              </div>
+        {/* Dedicated Standalone "Share Receipt" Modal */}
+        <ShareReceiptModal
+          isOpen={showShareModal}
+          transaction={transaction}
+          currencySymbol={currencySymbol}
+          displayAmount={displayAmount}
+          statusText={ledgerStatus.label === "Credited" || ledgerStatus.label === "Debited" ? "Successful" : ledgerStatus.label}
+          formattedDateTime={formattedDateTime}
+          recipientNameDisplay={recipientNameDisplay}
+          recipientBankAndAcc={recipientBankAndAcc}
+          senderNameDisplay={senderNameDisplay}
+          senderBankAndAcc={senderBankAndAcc}
+          txTypeDisplay={txTypeDisplay}
+          displayNarration={displayNarration || ""}
+          onClose={() => setShowShareModal(false)}
+        />
 
-              {/* Ticket Card Container */}
-              <div className="flex-1 overflow-y-auto px-4 py-2 flex flex-col items-center custom-scrollbar pb-28">
-                <div
-                  ref={shareReceiptRef}
-                  className="relative w-full max-w-sm bg-white rounded-[24px] p-6 shadow-sm flex flex-col space-y-4 text-black border border-gray-100/80 overflow-hidden"
-                >
-                  {/* Optional Background Image Layer */}
-                  {config.receiptBgImageEnabled && config.receiptBgImageUrl && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden rounded-[24px]">
-                      <img
-                        src={config.receiptBgImageUrl}
-                        alt="Receipt Background"
-                        style={{
-                          opacity: config.receiptBgImageOpacity ?? 0.15,
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                      />
-                    </div>
-                  )}
+        {/* Report Transaction PIN / Biometric Modal */}
+        <InvestmentPinModal
+          isOpen={isReportPinModalOpen}
+          onClose={() => setIsReportPinModalOpen(false)}
+          title="Authorize Report Submission"
+          description="Enter your 4-digit PIN to authorize submitting this transaction report."
+          isSubmitting={isSubmittingReport}
+          onPinSubmit={(pin, isBiometric) => handleExecuteReportSubmission(pin, isBiometric)}
+        />
 
-                  {/* Top Header: App Logo & Receipt Label */}
-                  <div className="relative z-10 flex justify-between items-center pb-2">
-                    <div className="flex items-center gap-2">
-                      <AppLogo size={32} />
-                      <span className="font-extrabold text-lg text-black tracking-tight">{config.appName || "E-Global Pay"}</span>
-                    </div>
-                    <span className="text-xs font-semibold text-gray-500">Transaction Receipt</span>
-                  </div>
-
-                  {/* Amount & Status */}
-                  <div className="relative z-10 text-center py-2 space-y-1">
-                    <h1 className="font-mono text-3xl font-extrabold text-[#00B96B]">
-                      {currencySymbol}{displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </h1>
-                    <p className="font-bold text-sm text-gray-900">{statusText}</p>
-                    <p className="text-[11px] text-gray-400 font-medium">{formattedDateTime}</p>
-                  </div>
-
-                  <div className="relative z-10 border-b border-gray-100" />
-
-                  {/* Transaction Details */}
-                  <div className="relative z-10 space-y-3.5 text-xs">
-                    {/* Recipient Details */}
-                    <div className="flex justify-between items-start">
-                      <span className="text-gray-400 font-medium shrink-0 pt-0.5">Recipient Details</span>
-                      <div className="text-right flex flex-col items-end pl-3">
-                        <span className="font-bold text-gray-900 leading-tight">{recipientNameDisplay}</span>
-                        <span className="text-gray-500 text-[11px] font-medium leading-tight mt-0.5">{recipientBankAndAcc}</span>
-                      </div>
-                    </div>
-
-                    {/* Sender Details */}
-                    <div className="flex justify-between items-start">
-                      <span className="text-gray-400 font-medium shrink-0 pt-0.5">Sender Details</span>
-                      <div className="text-right flex flex-col items-end pl-3">
-                        <span className="font-bold text-gray-900 leading-tight">{senderNameDisplay}</span>
-                        <span className="text-gray-500 text-[11px] font-medium leading-tight mt-0.5">{senderBankAndAcc}</span>
-                      </div>
-                    </div>
-
-                    {/* Transaction Type */}
-                    {txTypeDisplay && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400 font-medium">Transaction Type</span>
-                        <span className="font-bold text-gray-900 text-right">{txTypeDisplay}</span>
-                      </div>
-                    )}
-
-                    {/* Remark / Narration */}
-                    {displayNarration && (
-                      <div className="flex justify-between items-start">
-                        <span className="text-gray-400 font-medium shrink-0">Remark</span>
-                        <span className="font-bold text-gray-900 text-right pl-3 break-words max-w-[250px] leading-snug">{displayNarration}</span>
-                      </div>
-                    )}
-
-                    {/* Transaction No. */}
-                    <div className="flex justify-between items-start">
-                      <span className="text-gray-400 font-medium shrink-0">Transaction No.</span>
-                      <span className="font-mono font-semibold text-gray-900 text-right text-[11px] pl-3 break-all">{transaction.reference}</span>
-                    </div>
-
-                    {/* Session ID */}
-                    {transaction.sessionId && (
-                      <div className="flex justify-between items-start">
-                        <span className="text-gray-400 font-medium shrink-0">Session ID</span>
-                        <span className="font-mono font-semibold text-gray-900 text-right text-[11px] pl-3 break-all">{transaction.sessionId}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Card Disclaimer Footer */}
-                  <div className="relative z-10 pt-3 border-t border-gray-100">
-                    <p className="text-[10px] text-gray-400 leading-relaxed font-normal">
-                      {config.receiptCbnText || "E-Global Pay is a Fintech app powered by Flutterwave, licensed by CBN and insured by NDIC."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Share Actions Bar */}
-              <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex items-center justify-around shadow-lg z-20">
-                <button
-                  type="button"
-                  disabled={generating}
-                  onClick={handleShareImageFromModal}
-                  className="flex-1 py-3 flex items-center justify-center gap-2 text-[#00B96B] font-bold text-sm hover:bg-gray-50 active:scale-95 transition-all rounded-xl cursor-pointer disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-lg font-bold">image</span>
-                  <span>Share as image</span>
-                </button>
-                <div className="w-[1px] h-6 bg-gray-200" />
-                <button
-                  type="button"
-                  disabled={generating}
-                  onClick={handleSharePdfFromModal}
-                  className="flex-1 py-3 flex items-center justify-center gap-2 text-[#00B96B] font-bold text-sm hover:bg-gray-50 active:scale-95 transition-all rounded-xl cursor-pointer disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-lg font-bold">picture_as_pdf</span>
-                  <span>Share as PDF</span>
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Dedicated Report Transaction Issue Modal */}
+        <ReportTransactionIssueModal
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          transaction={transaction}
+          onAuthorizeAndSubmit={handleAuthorizeReportRequest}
+          isSubmitting={isSubmittingReport}
+        />
       </motion.div>
     </AnimatePresence>
   );
