@@ -65,7 +65,7 @@ export async function POST(req: Request) {
         }, { status: 400 });
       }
 
-      const gatewayUrl = getGatewayUrl().replace(/\\/+$/, "");
+      const gatewayUrl = getGatewayUrl().replace(/\/+$/, "");
       const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
       if (!gatewayApiKey) {
         await adminDb.collection("login_2fa_otps").doc(uid).delete().catch(() => undefined);
