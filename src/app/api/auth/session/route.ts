@@ -87,7 +87,7 @@ async function dispatchOtpToChannel(
   rawOtp: string,
   uid: string
 ): Promise<boolean> {
-  const gatewayUrl = GATEWAY_URL.replace(/\/+$, "");
+  const gatewayUrl = GATEWAY_URL.replace(/\/+$/, "");
   if (!GATEWAY_API_KEY) {
     console.error("[New Device OTP] Backend gateway API key is not configured.");
     return false;
